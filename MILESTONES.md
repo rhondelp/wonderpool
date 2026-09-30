@@ -3,7 +3,7 @@
 | ID | Phase | Title | Status | Date done | Commit hash |
 |---|---|---|---|---|---|
 | M0 | 0 | Setup | Done | 2026-10-01 | 7c42f4f |
-| M1 | 1 | Data layer | Done | 2026-10-01 | HASH_PLACEHOLDER |
+| M1 | 1 | Data layer | Done | 2026-10-01 | e1e0b27 |
 | M2 | 2 | Admin foundation | Not started | | |
 | M3 | 3 | Content modules | Not started | | |
 | M4 | 4 | Booking engine | Not started | | |
@@ -30,7 +30,7 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 
 # Reports
 
-## M1 Data layer (Done 2026-10-01, commit HASH_PLACEHOLDER)
+## M1 Data layer (Done 2026-10-01, commit e1e0b27)
 **Goal:** Full schema, models, enums, factories and seeders per PLAN.md §4, ready for services.
 **Delivered:**
 - 7 string-backed enums with label()/color(); Money helper (centavos, D-001)
