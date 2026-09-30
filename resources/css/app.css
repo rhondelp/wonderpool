@@ -1,0 +1,56 @@
+/*
+ * Wonderpool Garden Resort — design tokens & base styles.
+ * Tailwind v4 CSS-first config: ALL colors/fonts live in the @theme block below (see HISTORY.md D-002).
+ * Do not hard-code colors anywhere else; use pool-*, garden-* (and Tailwind's neutral/status palettes).
+ */
+
+@import '@fontsource/poppins/400.css';
+@import '@fontsource/poppins/500.css';
+@import '@fontsource/poppins/600.css';
+@import '@fontsource/poppins/700.css';
+
+@import 'tailwindcss';
+
+@plugin '@tailwindcss/forms';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Pool — blue/aqua: primary actions, links, headers. */
+    --color-pool-50: #eefbfd;
+    --color-pool-100: #d4f3f9;
+    --color-pool-200: #aee7f3;
+    --color-pool-300: #76d4ea;
+    --color-pool-400: #37b8d9;
+    --color-pool-500: #1b9bbf;
+    --color-pool-600: #197ca1;
+    --color-pool-700: #1b6483;
+    --color-pool-800: #1f536c;
+    --color-pool-900: #1e465c;
+    --color-pool-950: #0f2d3e;
+
+    /* Garden — green: secondary accents, success states. */
+    --color-garden-50: #effaf2;
+    --color-garden-100: #d8f3df;
+    --color-garden-200: #b4e6c3;
+    --color-garden-300: #82d19f;
+    --color-garden-400: #4fb577;
+    --color-garden-500: #2d9a5b;
+    --color-garden-600: #1f7c48;
+    --color-garden-700: #1a633c;
+    --color-garden-800: #184f32;
+    --color-garden-900: #15412b;
+    --color-garden-950: #0a2418;
+}
+
+@layer base {
+    [x-cloak] {
+        display: none !important;
+    }
+}
