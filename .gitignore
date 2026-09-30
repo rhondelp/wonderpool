@@ -2,6 +2,9 @@
 .env
 .env.*
 !.env.example
+.env.backup
+.env.production
+/auth.json
 /storage/*.key
 
 # Dependencies & builds
@@ -9,12 +12,26 @@
 /node_modules
 /public/build
 /public/hot
+/public/storage
+/storage/pail
+
+# Test / tool caches
+.phpunit.result.cache
+/.phpunit.cache
+.phpactor.json
 
 # Editors / OS
 .idea
 .vscode
+/.fleet
+/.nova
+/.zed
 .DS_Store
+Thumbs.db
+Homestead.json
+Homestead.yaml
 
 # Dumps & logs
 *.sql
+*.sqlite
 *.log
