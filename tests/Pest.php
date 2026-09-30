@@ -4,9 +4,10 @@
 |--------------------------------------------------------------------------
 | Test Case
 |--------------------------------------------------------------------------
-| Feature tests extend Tests\TestCase. Add RefreshDatabase per test file (or here)
-| once migrations exist (M1). Tests use in-memory SQLite (phpunit.xml).
+| Feature tests extend Tests\TestCase and run against a fresh in-memory
+| SQLite database (phpunit.xml) via RefreshDatabase. Unit tests are plain PHP.
 */
 
 pest()->extend(Tests\TestCase::class)
+    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
     ->in('Feature');
