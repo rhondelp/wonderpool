@@ -2,7 +2,7 @@
 
 | ID | Phase | Title | Status | Date done | Commit hash |
 |---|---|---|---|---|---|
-| M0 | 0 | Setup | Done | 2026-10-01 | HASH_PLACEHOLDER |
+| M0 | 0 | Setup | Done | 2026-10-01 | 7c42f4f |
 | M1 | 1 | Data layer | Not started | | |
 | M2 | 2 | Admin foundation | Not started | | |
 | M3 | 3 | Content modules | Not started | | |
@@ -30,7 +30,7 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 
 # Reports
 
-## M0 Setup (Done 2026-10-01, commit HASH_PLACEHOLDER)
+## M0 Setup (Done 2026-10-01, commit 7c42f4f)
 **Goal:** Laravel project, tooling, design tokens and base layouts ready for feature work.
 **Delivered:**
 - Laravel 12 in repo root; MySQL env (db `wonderpool`), APP_NAME, APP_TIMEZONE=Asia/Manila
