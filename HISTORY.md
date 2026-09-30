@@ -25,22 +25,35 @@
 | ID | Date | Decision | Reason | Milestone |
 |---|---|---|---|---|
 | D-000 | 2026-10-01 | Repo `https://github.com/rhondelp/wonderpool.git` (PUBLIC), default branch `main`. Bootstrap commit only on main; then one branch per phase `phase/M<id>-<slug>`, post-launch `change/<slug>`; Conventional Commits with milestone ID; PR into main, reviewed/merged by owner only; no force-push/history rewrite. | Reviewable phases; public repo requires strict secret hygiene. | M0 |
-| D-001 | 2026-10-01 | Money = integer centavos (`unsignedBigInteger`, column suffix `_cents`, e.g. `total_cents`); format as ₱ only at display time. | Exact arithmetic (nights × rate, discounts, deposits) with no float/rounding drift; ints are cheap to SUM in reports; no string-decimal casts. | M0 |
+| D-001 | 2026-10-01 | Money = integer centavos (`unsignedInteger`, max ≈ ₱42.9M; signed `integer` only for deltas), column suffix `_cents` (e.g. `total_amount_cents`); convert/format only via `App\Support\Money` (M1). | Exact arithmetic (nights × rate, discounts, deposits) with no float/rounding drift; ints are cheap to SUM in reports; no string-decimal casts. | M0 |
 | D-002 | 2026-10-01 | Tailwind v4 CSS-first config: tokens live in `resources/css/app.css` `@theme` (no tailwind.config.js); forms plugin via `@plugin`. This file IS "the tailwind config". | Laravel 12 ships Tailwind v4; avoids a legacy JS config. | M0 |
-| D-003 | 2026-10-01 | PROVISIONAL palette `pool-*` (aqua/blue, 50–950, primary = pool-600) and `garden-*` (green, 50–950). Neutrals = slate; warning = amber; danger = rose. | PLAN.md §7 was empty at M0; reconcile when PLAN.md is available. | M0 |
-| D-004 | 2026-10-01 | PROVISIONAL badge colors (x-ui.badge): pending/awaiting_payment/partial=amber, confirmed=pool, checked_in/paid=garden, completed/no_show/refunded=slate, cancelled/rejected/unpaid=rose. | PLAN.md status list unavailable at M0; final cases come from enums in M1/M4. | M0 |
+| D-003 | 2026-10-01 | Palette = PLAN.md §7: `pool-*` = Tailwind cyan, `garden-*` = Tailwind green (missing 200/400/800/950 shades filled from the same scales). Neutrals = slate; warning = amber; danger = rose. | Reconciled with PLAN.md in M1 (was provisional in M0). | M1 |
+| D-004 | 2026-10-01 | Badge colors come from enum `color()`: BookingStatus pending=amber, approved=garden, rejected=rose, completed=pool, cancelled=slate; PaymentStatus pending=amber, verified=garden, rejected=rose. `x-ui.badge :status` takes the enum. | PLAN.md §7; single source of truth in enums. | M1 |
 | D-005 | 2026-10-01 | Layouts use `@extends`/`@yield` (`layouts.public`, `layouts.admin`) with shared `partials.head`; stacks `styles` and `scripts`; flash via `x-ui.flash` reading session keys success/error/warning/info. | Simple, familiar Blade inheritance; one place for meta tags. | M0 |
 | D-006 | 2026-10-01 | Tests: Pest, in-memory SQLite (phpunit.xml); `Tests\TestCase::setUp` calls `withoutVite()`. | Fast, no MySQL needed in CI or locally. | M0 |
 | D-007 | 2026-10-01 | `/design-preview` route registered only when `APP_ENV=local`. REMOVE IN M9. | Visual QA of theme/components without exposing it in prod. | M0 |
+| D-008 | 2026-10-01 | White text only on `pool-700+` / `garden-700+` (primary button = `bg-pool-700 hover:bg-pool-800`), not PLAN's `pool-600`. | White on pool-600 (#0891b2) is ~3.7:1, fails WCAG AA; pool-700 is ~5.4:1. | M1 |
+| D-009 | 2026-10-01 | Datetimes stored as local Asia/Manila wall-clock (app timezone), no UTC conversion. Booking windows are half-open `[starts_at, ends_at)`; overlap = `starts_at < E AND ends_at > S` (touching ≠ overlap). | Single-location resort; PLAN.md §5.1. | M1 |
+| D-010 | 2026-10-01 | Enums stored as `string(20)` columns (not MySQL ENUM) and cast in models. | Adding a case needs no ALTER TABLE; portable to SQLite tests. | M1 |
+| D-011 | 2026-10-01 | FK delete rules: package/add-on → `restrict` (keep history), owned children (pricing_rules, booking_add_ons, payments) → `cascade`, actor columns (approved_by, verified_by, created_by, activity_logs.user_id) → `set null`. | History preserved; deleting a user never deletes bookings. | M1 |
+| D-012 | 2026-10-01 | Settings keys are dotted `group.name`; `SettingSeeder` uses firstOrCreate (never overwrites admin edits). Owner credentials come only from `.env` via `config('wonderpool.owner.*')`. | Safe re-seeding; no credentials in git. | M1 |
+| D-013 | 2026-10-01 | Guest phone stored in E.164 (`+639XXXXXXXXX`), indexed for track-booking lookup. | One canonical format for lookups/SMS later. | M1 |
 
 ## Folder Map
 | Path | Purpose | Milestone |
 |---|---|---|
 | `/` | CLAUDE.md, PLAN.md, HISTORY.md, CHANGELOG.md, MILESTONES.md, README.md, pint.json, phpstan.neon | M0 |
 | `.github/workflows/ci.yml` | CI: Pint, Larastan, npm build, Pest | M0 |
-| `app/` | Laravel app code (Services/Enums/Requests added from M1) | M0 |
+| `app/` | Laravel app code | M0 |
+| `app/Enums/` | String-backed enums with label()/color() | M1 |
+| `app/Models/` | Eloquent models (see Models & Relationships) | M1 |
+| `app/Support/Money.php` | Centavo convert/format helpers (D-001) | M1 |
 | `config/app.php` | timezone = env APP_TIMEZONE (Asia/Manila) | M0 |
-| `docs/` | architecture, database, booking-flow, admin-guide, deployment (stubs) | M0 |
+| `config/wonderpool.php` | App config: `owner.name/email/password` from env | M1 |
+| `database/migrations/2026_10_01_*` | M1 schema (users alter + 12 tables) | M1 |
+| `database/factories/` | Factory per model; `Concerns/PhilippineData` (PH names, +639 mobiles) | M1 |
+| `database/seeders/` | DatabaseSeeder → Owner, Package, Amenity, Setting, Faq seeders | M1 |
+| `docs/` | architecture, database (ERD + dictionary, M1), booking-flow, admin-guide, deployment | M0 |
 | `resources/css/app.css` | Tailwind v4 entry + `@theme` tokens + Poppins imports (D-002) | M0 |
 | `resources/js/app.js` | Alpine + focus plugin bootstrap | M0 |
 | `resources/views/layouts/` | `public.blade.php` (guest site), `admin.blade.php` (sidebar/drawer) | M0 |
@@ -51,6 +64,9 @@
 | `resources/views/design-preview.blade.php` | Component gallery, local only (remove M9) | M0 |
 | `routes/web.php` | Web routes | M0 |
 | `tests/Feature/SmokeTest.php` | Boot/home/design-preview guard tests | M0 |
+| `tests/Feature/Models/` | FactoriesTest, BookingScopesTest (overlap edge cases) | M1 |
+| `tests/Feature/SeederTest.php` | Seed data, idempotency, owner env guard | M1 |
+| `tests/Unit/` | MoneyTest, EnumsTest | M1 |
 
 ## Routes Table
 | Method | URI | Name | Controller@action | Middleware | Milestone |
@@ -62,13 +78,49 @@
 ## Database Tables
 | Table | Key columns | Relations | Milestone |
 |---|---|---|---|
+| users | email UK, role, is_active | → bookings (approved_by), payments (verified_by), blocked_dates (created_by), activity_logs | M1 (alter) |
+| packages | code UK, base_price_cents, start_time, end_time, crosses_midnight, max_pax, is_active, sort_order | → bookings (restrict), pricing_rules (cascade) | M1 |
+| add_ons | price_cents, is_active | → booking_add_ons (restrict) | M1 |
+| pricing_rules | package_id?, type, starts_on, ends_on, days_of_week json, adjustment_type, adjustment_value, priority | package (null = global) | M1 |
+| bookings | reference_code UK, package_id, starts_at, ends_at, total_amount_cents, downpayment_required_cents, status, approved_by; soft deletes; IDX (starts_at,ends_at), status, guest_phone | package, approver, booking_add_ons, payments | M1 |
+| booking_add_ons | booking_id, add_on_id (UK pair), quantity, unit_price_cents | booking (cascade), add_on (restrict) | M1 |
+| payments | booking_id, type, amount_cents, proof_path, status, reference_no, verified_by | booking (cascade), verifier (set null) | M1 |
+| blocked_dates | starts_at, ends_at, reason, created_by | creator (set null) | M1 |
+| amenities | name, icon (heroicon), image_path, is_active, sort_order | — | M1 |
+| gallery_images | path, caption, category, is_visible, sort_order | — | M1 |
+| faqs | question, answer, sort_order, is_active | — | M1 |
+| settings | key UK, value text, group | — | M1 |
+| activity_logs | user_id?, action, subject morph, properties json, created_at only | user (set null), subject (morph) | M1 |
+
+Full dictionary + ERD: `docs/database.md`.
 
 ## Models & Relationships
-- _none yet_
+| Model | Relationships | Scopes / helpers | Milestone |
+|---|---|---|---|
+| User | approvedBookings (hasMany Booking), activityLogs | active(); isOwner(); casts role→UserRole | M1 |
+| Package | bookings, pricingRules | active(), ordered(); formatted_price | M1 |
+| AddOn | bookings (belongsToMany via BookingAddOn) | active(); formatted_price | M1 |
+| BookingAddOn (Pivot) | booking, addOn | line_total_cents, formattedLineTotal() | M1 |
+| PricingRule | package | active(), forPackage($id) | M1 |
+| Booking | package, approver (User), addOns (pivot quantity/unit_price_cents), payments | active() (pending+approved), overlapping($s,$e), status($enum); formatted_total, formatted_downpayment; SoftDeletes | M1 |
+| Payment | booking, verifier (User) | verified(); formatted_amount | M1 |
+| BlockedDate | creator (User) | overlapping($s,$e) | M1 |
+| Amenity | — | active(), ordered() | M1 |
+| GalleryImage | — | visible(), ordered() | M1 |
+| Faq | — | active(), ordered() | M1 |
+| Setting | — | — (read via SettingService, M2+) | M1 |
+| ActivityLog | user, subject (morphTo) | UPDATED_AT = null | M1 |
 
 ## Enums
 | Name | Cases | Milestone |
 |---|---|---|
+| BookingStatus | pending, approved, rejected, cancelled, completed; label(), color(), static blocking() = [pending, approved] | M1 |
+| PaymentStatus | pending, verified, rejected; label(), color() | M1 |
+| PaymentType | downpayment, balance, full; label() | M1 |
+| UserRole | owner, staff; label(), color() | M1 |
+| PricingRuleType | weekend, holiday, season; label() | M1 |
+| PricingAdjustmentType | percent (whole % points), fixed (signed centavos); label() | M1 |
+| GalleryCategory | pools, rooms, hall, events; label() | M1 |
 
 ## Services Index
 | Class | Public methods (purpose) | Milestone |
@@ -82,7 +134,7 @@
 | `x-ui.select` | name*, options[value=>label], label, id, selected, placeholder, hint, required | design-preview | M0 |
 | `x-ui.textarea` | name*, label, id, value, rows, hint, required | design-preview | M0 |
 | `x-ui.card` | title, padded; slots actions, footer | design-preview | M0 |
-| `x-ui.badge` | status (booking/payment, D-004), color(pool/garden/amber/rose/slate) | design-preview | M0 |
+| `x-ui.badge` | status (BookingStatus/PaymentStatus/UserRole enum → label/color, D-004), color(pool/garden/amber/rose/slate) | design-preview | M1 |
 | `x-ui.modal` | name*, title, maxWidth(sm/md/lg/xl), show; slot footer; events open-modal/close-modal | design-preview | M0 |
 | `x-ui.alert` | type(success/error/warning/info), title, dismissible | x-ui.flash, design-preview | M0 |
 | `x-ui.flash` | — (reads session success/error/warning/info) | both layouts | M0 |
@@ -93,6 +145,18 @@
 ## Settings Keys
 | Key | Group | Default | Meaning | Milestone |
 |---|---|---|---|---|
+| general.resort_name | general | Wonderpool Garden Resort | Display name | M1 |
+| booking.downpayment_percent | booking | 50 | % of total required as downpayment | M1 |
+| booking.pending_hold_hours | booking | 24 | Hours before an unpaid pending booking expires (§5.3) | M1 |
+| booking.lead_time_hours | booking | 24 | Minimum hours between booking and start | M1 |
+| booking.max_advance_days | booking | 365 | How far ahead guests may book | M1 |
+| payment.instructions | payment | GCash/bank PLACEHOLDER text | Shown on booking step 3 | M1 |
+| contact.phone | contact | +63 9XX XXX XXXX (placeholder) | Public contact number | M1 |
+| contact.email | contact | info@example.com (placeholder) | Public contact email | M1 |
+| contact.address | contact | placeholder | Resort address | M1 |
+| contact.map_embed_url | contact | "" | Google Maps embed URL | M1 |
+| social.facebook_url | social | https://www.facebook.com/ (placeholder) | Facebook page | M1 |
+| social.instagram_url | social | "" | Instagram page | M1 |
 
 ## Scheduled Commands & Jobs
 | Command/Job | Schedule | Purpose | Milestone |
@@ -113,19 +177,23 @@
 | DB_CONNECTION/HOST/PORT/DATABASE/USERNAME/PASSWORD | MySQL connection (db `wonderpool`) | M0 |
 | SESSION_DRIVER, CACHE_STORE, QUEUE_CONNECTION | `database` (needs migrations) | M0 |
 | MAIL_* | Mailer; `log` in dev | M0 |
+| OWNER_NAME | Initial owner display name (OwnerSeeder) | M1 |
+| OWNER_EMAIL | Initial owner login email; seeder skips if empty | M1 |
+| OWNER_PASSWORD | Initial owner password (.env only, never committed); seeder skips if empty | M1 |
 
 ## Business Flow Summaries
 ### Booking flow
 - _tbd (M4/M5)_
 ### Status lifecycle
-- _tbd (M4)_
+- States (M1 enum): pending → approved → completed; pending → rejected | cancelled; approved → cancelled. Proof upload keeps `pending` (payment status tracks verification). Transition guard in BookingService (M4).
 ### Pricing
-- _tbd (M4)_
+- _tbd (M4)_ Data ready (M1): packages.base_price_cents, pricing_rules (priority asc), booking_add_ons.unit_price_cents snapshot.
 ### Availability
-- _tbd (M4)_
+- Unavailable if any `Booking::active()->overlapping(S, E)` or `BlockedDate::overlapping(S, E)` (M1 scopes; half-open, D-009). Service + locking in M4.
 
 ## Known Issues / TODO
-- PLAN.md is still empty (0 bytes) at end of M0 and was NOT committed; D-003/D-004 are provisional — reconcile palette & statuses with PLAN.md §7/§8. (M0)
-- Local XAMPP MariaDB fails to start (InnoDB "log sequence number is in the future" — data dir damaged). `php artisan migrate` on MySQL not yet run; app verified with SESSION_DRIVER=file. (M0)
+- Local XAMPP MariaDB fails to start (InnoDB "log sequence number is in the future", damaged data dir). M1 schema verified on a throwaway MariaDB 10.4 (migrate:fresh --seed, full rollback, re-migrate); run `php artisan migrate --seed` on the real DB once fixed. (M0/M1)
+- Settings contact/payment/social values are placeholders; replace once the owner answers PLAN.md §14 Q5. (M1)
+- Day package hours (7AM–5PM) and Day max pax (50) are proposed defaults pending owner confirmation (PLAN.md §1). (M1)
 - Admin/public nav links are `#` placeholders until routes exist (M2/M5). (M0)
 - Remove `/design-preview` route + view in M9 (D-007). (M0)

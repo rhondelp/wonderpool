@@ -15,6 +15,28 @@ ENTRY TEMPLATE
 
 ## Unreleased
 
+## [M1] Data layer - 2026-10-01
+### Added
+- Enums with label()/color(): BookingStatus, PaymentStatus, PaymentType, UserRole, PricingRuleType, PricingAdjustmentType, GalleryCategory (files: app/Enums/*.php)
+- Money centavo helper: fromPesos, toPesos, format (files: app/Support/Money.php)
+- Migrations: users role/is_active; packages, add_ons, pricing_rules, bookings (soft deletes, window/status/phone indexes), booking_add_ons, payments, blocked_dates, amenities, gallery_images, faqs, settings, activity_logs (files: database/migrations/2026_10_01_000100…001300_*.php)
+- Models with casts, relationships, PHPDoc, scopes (Booking::active/overlapping/status, BlockedDate::overlapping, Package/Amenity/Faq active+ordered, GalleryImage visible, PricingRule forPackage) and money accessors (files: app/Models/*.php)
+- Factories for every model with PH sample data and states (files: database/factories/*.php, database/factories/Concerns/PhilippineData.php)
+- Seeders: Owner (from .env), Package (DAY-A/NIGHT-D/24H), Amenity (8), Setting, Faq (files: database/seeders/*.php, config/wonderpool.php, .env.example)
+- Tests: factories, overlap edge cases, seeders, enums, money (files: tests/Feature/Models/FactoriesTest.php, tests/Feature/Models/BookingScopesTest.php, tests/Feature/SeederTest.php, tests/Unit/MoneyTest.php, tests/Unit/EnumsTest.php, tests/Pest.php)
+- ER diagram + table dictionary (files: docs/database.md)
+### Changed
+- Palette aligned with PLAN.md §7 (cyan/green); primary button and white-text surfaces moved to 700 shades for AA (files: resources/css/app.css, resources/views/components/ui/button.blade.php, resources/views/partials/head.blade.php, resources/views/home.blade.php, resources/views/layouts/public.blade.php)
+- x-ui.badge takes a status enum (label/color from enum) instead of a string map (files: resources/views/components/ui/badge.blade.php, resources/views/design-preview.blade.php)
+- User model: role/is_active casts, relationships, active scope; UserFactory owner/inactive states (files: app/Models/User.php, database/factories/UserFactory.php)
+### Removed
+- tests/Unit/.gitkeep (files: tests/Unit/.gitkeep)
+### DB: added 2026_10_01_000100_add_role_and_is_active_to_users_table + 12 create_* migrations (packages, add_ons, pricing_rules, bookings, booking_add_ons, payments, blocked_dates, amenities, gallery_images, faqs, settings, activity_logs)
+### Routes: none
+### Breaking / Notes
+- `x-ui.badge status="..."` strings no longer work; pass an enum (`:status="$booking->status"`).
+- New env vars OWNER_NAME / OWNER_EMAIL / OWNER_PASSWORD (seeder skips owner when unset).
+
 ## [M0] Setup - 2026-10-01
 ### Added
 - Laravel 12 skeleton merged into repo root; Laravel ignore rules merged (files: app/, bootstrap/, config/, database/, public/, routes/, storage/, artisan, composer.json, composer.lock, package.json, package-lock.json, vite.config.js, phpunit.xml, .editorconfig, .gitattributes, .gitignore)
