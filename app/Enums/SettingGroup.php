@@ -14,6 +14,8 @@ enum SettingGroup: string
     case Payment = 'payment';
     case Contact = 'contact';
     case Social = 'social';
+    case Content = 'content';
+    case Seo = 'seo';
 
     /**
      * Tab label on the settings screen.
@@ -26,6 +28,8 @@ enum SettingGroup: string
             self::Payment => 'Payment',
             self::Contact => 'Contact',
             self::Social => 'Social links',
+            self::Content => 'Website content',
+            self::Seo => 'SEO',
         };
     }
 
@@ -40,6 +44,8 @@ enum SettingGroup: string
             self::Payment => 'banknotes',
             self::Contact => 'phone',
             self::Social => 'share',
+            self::Content => 'document-text',
+            self::Seo => 'magnifying-glass',
         };
     }
 
@@ -72,6 +78,20 @@ enum SettingGroup: string
             self::Social => [
                 'social.facebook_url' => ['label' => 'Facebook page', 'type' => 'url', 'default' => 'https://www.facebook.com/', 'rules' => ['nullable', 'url:https', 'max:255']],
                 'social.instagram_url' => ['label' => 'Instagram page', 'type' => 'url', 'default' => '', 'rules' => ['nullable', 'url:https', 'max:255']],
+            ],
+            self::Content => [
+                'content.tagline' => ['label' => 'Tagline', 'type' => 'text', 'default' => 'Pools · Gardens · Good times', 'rules' => ['nullable', 'string', 'max:120'], 'hint' => 'Short line shown in the footer and under the logo.'],
+                'content.hero_title' => ['label' => 'Home headline', 'type' => 'text', 'default' => 'Your private pool and garden escape', 'rules' => ['required', 'string', 'max:120']],
+                'content.hero_subtitle' => ['label' => 'Home sub-headline', 'type' => 'textarea', 'default' => 'Book the whole resort for your family day, birthday or company outing. Day, night and 24-hour packages.', 'rules' => ['nullable', 'string', 'max:300']],
+                'content.about' => ['label' => 'About the resort', 'type' => 'textarea', 'default' => '', 'rules' => ['nullable', 'string', 'max:3000'], 'hint' => 'Shown on the home page. Leave blank to hide. Supports **bold**, lists (- item) and line breaks.'],
+                'content.highlights' => ['label' => 'Highlights', 'type' => 'textarea', 'default' => "Exclusive use: the whole resort is yours\nAdult and kiddie pools\nFunction hall for up to 50 guests\nFree parking", 'rules' => ['nullable', 'string', 'max:1000'], 'hint' => 'One highlight per line (up to 6 are shown). Leave blank to hide.'],
+                'content.house_rules' => ['label' => 'House rules', 'type' => 'textarea', 'default' => "- Proper swimming attire is required in the pools.\n- Children must be supervised by an adult at all times.\n- No glass bottles in the pool area.\n- Please keep the noise down after 10:00 PM.", 'rules' => ['nullable', 'string', 'max:5000'], 'hint' => 'Shown on the Policies page. PLACEHOLDER rules: replace with the resort\'s own. Supports lists (- item).'],
+                'content.cancellation_policy' => ['label' => 'Cancellation & reschedule policy', 'type' => 'textarea', 'default' => '', 'rules' => ['nullable', 'string', 'max:5000'], 'hint' => 'Shown on the Policies page and booking summary. Leave blank to hide (PLAN.md §14 Q4).'],
+                'content.booking_success_note' => ['label' => 'After booking: next steps', 'type' => 'textarea', 'default' => "We will check your payment proof and confirm your booking within 24 hours. Keep your reference code: you need it with your mobile number to track your booking.", 'rules' => ['nullable', 'string', 'max:2000']],
+            ],
+            self::Seo => [
+                'seo.meta_description' => ['label' => 'Search description', 'type' => 'textarea', 'default' => 'Wonderpool Garden Resort: private pools, gardens and function hall. Check availability and book online.', 'rules' => ['nullable', 'string', 'max:300'], 'hint' => 'Shown by Google and when the site is shared (about 155 characters).'],
+                'seo.og_image_url' => ['label' => 'Share image URL', 'type' => 'url', 'default' => '', 'rules' => ['nullable', 'url:https', 'max:2000'], 'hint' => 'Image shown when the site is shared on Facebook. Blank = first gallery photo.'],
             ],
         };
     }
