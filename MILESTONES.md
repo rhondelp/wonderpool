@@ -7,7 +7,7 @@
 | M1 | 1 | Data layer | Done | 2026-10-01 | e1e0b27 |
 | M2 | 2 | Admin foundation | Done | 2026-10-01 | e2b4c84 |
 | M3 | 3 | Content modules | Done | 2026-10-01 | dd0d451 |
-| M4 | 4 | Booking engine | In review | 2026-10-01 | PENDING |
+| M4 | 4 | Booking engine | In review | 2026-10-01 | a8ee111 |
 | M5 | 5 | Public site | Not started | | |
 | M6 | 6 | Admin bookings | Not started | | |
 | M7 | 7 | Reports & logs | Not started | | |
@@ -31,7 +31,7 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 
 # Reports
 
-## M4 Booking engine (Done 2026-10-01, commit PENDING)
+## M4 Booking engine (Done 2026-10-01, commit a8ee111)
 **Goal:** Availability, pricing, safe booking creation, status lifecycle, pending-hold expiry, and admin management of blocked dates and pricing rules. No public UI.
 **Delivered:**
 - `AvailabilityService`: package windows (Night/24-Hour cross midnight), half-open checks vs pending/approved bookings and blocked dates, conflict lookup, per-day calendar map (2 queries), lead-time/max-advance check
