@@ -4,10 +4,12 @@ use App\Http\Controllers\Admin\AddOnController;
 use App\Http\Controllers\Admin\AmenityController;
 use App\Http\Controllers\Admin\Auth\LoginController;
 use App\Http\Controllers\Admin\Auth\PasswordController;
+use App\Http\Controllers\Admin\BlockedDateController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\FaqController;
 use App\Http\Controllers\Admin\GalleryController;
 use App\Http\Controllers\Admin\PackageController;
+use App\Http\Controllers\Admin\PricingRuleController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Enums\SettingGroup;
@@ -55,6 +57,10 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::resource('amenities', AmenityController::class)->except('show');
                 Route::resource('gallery', GalleryController::class)->except('show');
                 Route::resource('faqs', FaqController::class)->except('show');
+
+                // Booking engine admin (M4).
+                Route::resource('blocked-dates', BlockedDateController::class)->except('show');
+                Route::resource('pricing-rules', PricingRuleController::class)->except('show');
             });
         });
     });

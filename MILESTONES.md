@@ -6,8 +6,8 @@
 | M0.1 | 0 | Switch database to PostgreSQL (change) | Done | 2026-10-01 | 6209193 |
 | M1 | 1 | Data layer | Done | 2026-10-01 | e1e0b27 |
 | M2 | 2 | Admin foundation | Done | 2026-10-01 | e2b4c84 |
-| M3 | 3 | Content modules | In review | 2026-10-01 | dd0d451 |
-| M4 | 4 | Booking engine | Not started | | |
+| M3 | 3 | Content modules | Done | 2026-10-01 | dd0d451 |
+| M4 | 4 | Booking engine | In review | 2026-10-01 | a8ee111 |
 | M5 | 5 | Public site | Not started | | |
 | M6 | 6 | Admin bookings | Not started | | |
 | M7 | 7 | Reports & logs | Not started | | |
@@ -30,6 +30,42 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 -->
 
 # Reports
+
+## M4 Booking engine (Done 2026-10-01, commit a8ee111)
+**Goal:** Availability, pricing, safe booking creation, status lifecycle, pending-hold expiry, and admin management of blocked dates and pricing rules. No public UI.
+**Delivered:**
+- `AvailabilityService`: package windows (Night/24-Hour cross midnight), half-open checks vs pending/approved bookings and blocked dates, conflict lookup, per-day calendar map (2 queries), lead-time/max-advance check
+- `PricingService` + `PriceBreakdown`: matching rules stacked by priority on the running price (owner's choice), add-ons, max_pax, integer-centavo rounding, downpayment from settings
+- `ReferenceCodeGenerator`: `WP-YYMM-XXXX`, unambiguous alphabet, unique incl. soft-deleted
+- `BookingService`: create (pg_advisory_xact_lock → re-check → snapshot → pending), transition (central map, reject reason, approval stamp, completion only after the stay, `BookingStatusChanged` event, audit), reschedule (re-check ignoring itself, optional package switch and reprice), expireStale
+- PostgreSQL exclusion constraint `bookings_no_overlap` (second line of defense; 23P01 → SlotUnavailableException)
+- `bookings:expire-stale` every 15 minutes (`--dry-run` supported)
+- Admin Blocked dates (whole days or exact range, overlap warning, upcoming/past filter) and Pricing rules (validation per type, live sample preview, quote checker showing stacked rules)
+**Files created / modified:**
+- Services: app/Services/Booking/{AvailabilityService,PricingService,PriceBreakdown,ReferenceCodeGenerator,BookingService,BlockedDateService}.php
+- Domain: app/Exceptions/Booking/*.php, app/Events/BookingStatusChanged.php, app/Enums/ActivityAction.php, app/Models/{BlockedDate,PricingRule}.php
+- Console: app/Console/Commands/ExpireStaleBookings.php, routes/console.php
+- DB: database/migrations/2026_10_01_001500_add_booking_overlap_exclusion_constraint.php, database/factories/BookingFactory.php
+- HTTP/UI: app/Http/Controllers/Admin/{BlockedDate,PricingRule}Controller.php, app/Http/Requests/Admin/Content/*{BlockedDate,PricingRule}Request.php, app/Policies/{BlockedDate,PricingRule}Policy.php, resources/views/admin/{blocked-dates,pricing-rules}/*, resources/views/layouts/admin.blade.php, routes/web.php
+- Tests: tests/Feature/Booking/*.php, tests/Feature/Admin/Booking/*.php, tests/Pest.php
+- Docs: CHANGELOG.md, HISTORY.md, MILESTONES.md, docs/{deployment,admin-guide}.md
+**DB changes:** exclusion constraint `bookings_no_overlap` on bookings (reversible; verified migrate → rollback → migrate on PostgreSQL 18).
+**Routes:** admin.blocked-dates.*, admin.pricing-rules.* (resources except show).
+**How to verify:** `php artisan migrate`; `vendor/bin/pest` (335 tests; tests/Feature/Booking/* incl. "serializes creation with a PostgreSQL advisory lock", "has a database exclusion constraint…", "enforces the transition map for every status pair"); `vendor/bin/pint --test`; `vendor/bin/phpstan analyse` (no errors); `php artisan schedule:list` (bookings:expire-stale */15); `php artisan bookings:expire-stale --dry-run`; tinker: `app(App\Services\Booking\PricingService::class)->quote(App\Models\Package::first(), now()->next('Saturday'))->toArray()` and `app(App\Services\Booking\BookingService::class)->create([...])` (smoke-tested in a rolled-back transaction). Admin: Pricing rules → add a weekend +10% rule, watch the sample, use Quote check on a Saturday; Blocked dates → block a day that has a booking and read the warning.
+**Key decisions:** D-021 (advisory lock + exclusion constraint), D-022 (pricing stacking/rounding), D-023 (reference codes), D-024 (expiry), D-009 (half-open windows).
+**Edit entry points (where to change things later):**
+- **Transition map:** `app/Services/Booking/BookingService.php` → `TRANSITIONS` constant; extra preconditions (reason required, completion timing, approval stamp) in `applyTransition()`.
+- **Hold duration:** Settings → Booking rules "Pending hold (hours)" (key `booking.pending_hold_hours`); default and limits in `app/Enums/SettingGroup.php::fields()`; expiry logic in `BookingService::expireStale()`; schedule frequency in `routes/console.php`.
+- **Reference code format:** `app/Services/Booking/ReferenceCodeGenerator.php` constants `PREFIX`, `ALPHABET`, `RANDOM_LENGTH`, `MAX_ATTEMPTS` and the `ym` part in `generate()` (column `reference_code` is varchar(20)).
+- **Pricing rule precedence:** order in `PricingService::matchingRules()` (`orderBy('priority')->orderBy('id')`); how a rule changes the price in `applyRule()` / `percentOf()`; stacking loop in `quote()`. Keep the Alpine preview in `resources/views/admin/pricing-rules/_form.blade.php` in sync with `applyRule()`.
+- Downpayment rounding: `PricingService::quote()` (`downpaymentRequiredCents`).
+- Availability rules (what blocks a window): `AvailabilityService::isAvailable()` / `bookingsQuery()`; window shapes: `resolveWindow()`.
+- Lock key: `BookingService::BOOKING_LOCK_KEY`; constraint: the M4 migration.
+**Known limitations / follow-ups:**
+- Production must run the scheduler cron for expiry.
+- The exclusion constraint covers bookings only; blocked dates rely on the service check.
+- `BookingStatusChanged` has no listeners until M8 (notifications). Public booking UI/quote endpoint in M5; admin booking actions UI in M6.
+- Plan deviation: no retry on reference-code unique violations; creation is serialized by the advisory lock, so the existence check cannot race (unique index still guards).
 
 ## M3 Content modules (Done 2026-10-01, commit dd0d451)
 **Goal:** Owner can fully manage packages, add-ons, amenities, gallery and FAQs from the admin UI, with validation, audit and ordering.

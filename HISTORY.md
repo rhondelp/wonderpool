@@ -45,6 +45,10 @@
 | D-018 | 2026-10-01 | Content images live on the `public` disk (`storage/app/public`, served at `/storage` after `php artisan storage:link`): original at `{dir}/originals/{uuid}.{ext}`, WebP `{dir}/large/{uuid}.webp` (≤1600 px) and `{dir}/thumbs/{uuid}.webp` (≤480 px); dir = `gallery` or `amenities`. DB stores only the original's path; variant paths derived by `ImageService::variantPath()`. Uploads: jpg/png/webp, ≤5 MB, ≤8000 px/side; gallery ≤20 files per upload. Files deleted with the record or on replacement. Payment proofs are NOT here (private disk, M5). | Fast pages (thumbs/WebP) while keeping originals; unguessable UUID names. | M3 |
 | D-019 | 2026-10-01 | Content modules share `ContentService` (create/update/delete/reorder) and log `content.created/updated/deleted/reordered` with `{type, label}` (+ changed field names on update). Deletion guarded by `GuardsDeletion`: packages with any booking (incl. soft-deleted) and add-ons on any booking cannot be deleted → warning flash suggesting deactivation. | Bookings reference packages/add-ons with restrict FKs (D-011); one audit format. | M3 |
 | D-020 | 2026-10-01 | Display order: `sort_order` renumbered 1..n on every reorder. Reorder endpoints receive the visible ids (page/filter subset); those records swap among the slots they already hold in the full order. New records go last (max+1); blank sort_order on update keeps the current value. Admin search uses ILIKE with `%`/`_` escaped; filter `status=active|inactive` maps to `is_active` (gallery: `is_visible`). | Works with pagination and filters; repairs duplicate orders. | M3 |
+| D-021 | 2026-10-01 | Double-booking defense: every window-claiming write (BookingService::create/reschedule) runs in `DB::transaction` and first takes `pg_advisory_xact_lock(BookingService::BOOKING_LOCK_KEY = 7461001)`, then re-checks availability with plain `exists()` queries (never lockForUpdate + aggregates). Second line: partial exclusion constraint `bookings_no_overlap` (`EXCLUDE USING gist (tsrange(starts_at, ends_at, '[)') WITH &&) WHERE status IN ('pending','approved') AND deleted_at IS NULL`); SQLSTATE 23P01 → SlotUnavailableException. Blocked dates are enforced by the service only. Saving a blocked date never cancels bookings; it warns with their references. | Exclusive-use resort: row locks cannot stop two requests that both see no overlap. | M4 |
+| D-022 | 2026-10-01 | Pricing: base → every matching active rule (global or this package; date within [starts_on, ends_on], nulls open; ISO weekday in days_of_week if set) in `priority` asc, then id, each applied to the running package price (percent compounds) → + add-ons (never adjusted). Percent delta rounded half away from zero to the centavo; running price floored at 0; downpayment = round half up of total × `booking.downpayment_percent`. Rules match on the booking's start date. Bookings snapshot totals and add-on unit prices; reschedule keeps the snapshot unless `reprice`. | Owner chose "stack in priority order" (M4 plan). | M4 |
+| D-023 | 2026-10-01 | Reference codes `WP-{YYMM of stay}-{4 chars}` from `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (no 0/O/1/I/L); unique vs all bookings incl. soft-deleted; generated under the booking advisory lock, max 10 attempts. | Readable over the phone; collision-safe. | M4 |
+| D-024 | 2026-10-01 | Pending-hold expiry: `bookings:expire-stale` (every 15 min, withoutOverlapping) cancels `pending` bookings whose `created_at` ≤ now − `booking.pending_hold_hours` and that have no payment with a `proof_path`; logged as `booking.expired` with actor null. Lead time / max advance are checked by guest-facing requests (`AvailabilityService::isWithinBookingWindow`), not by `create()`, so admins can record walk-ins. | PLAN.md §5.3. | M4 |
 | D-014 | 2026-10-01 | Database engine is PostgreSQL. Switched from MySQL on 2026-10-01 because MySQL does not run on the dev machine. JSON columns are jsonb (no key-order guarantee); emails stored lowercase via User/Booking mutators; booking creation to be serialized with `pg_advisory_xact_lock` (PLAN.md §5.2). | Local MariaDB unusable; PostgreSQL available locally and in CI. | M0.1 |
 
 ## Folder Map
@@ -55,13 +59,16 @@
 | `app/` | Laravel app code | M0 |
 | `app/Enums/` | String-backed enums with label()/color() | M1 |
 | `app/Exceptions/ContentInUseException.php` | Delete refused (message shown to admins) | M3 |
+| `app/Exceptions/Booking/` | BookingException base + SlotUnavailable, GuestCountExceeded, InvalidAddOn, PackageUnavailable, InvalidStatusTransition, ReferenceCodeExhausted (messages safe to show) | M4 |
+| `app/Events/BookingStatusChanged.php` | Fired after each committed status change (listeners in M8) | M4 |
+| `app/Console/Commands/ExpireStaleBookings.php` | `bookings:expire-stale {--dry-run}` | M4 |
 | `app/Http/Controllers/Admin/` | Admin controllers; `Auth/` = Login, Password; content: Package, AddOn, Amenity, Gallery, Faq (M3) | M2/M3 |
 | `app/Http/Middleware/` | EnsureUserIsActive (`active`), EnsurePasswordIsChanged (`password.changed`), EnsureUserHasRole (`role`); aliases in bootstrap/app.php | M2 |
 | `app/Http/Requests/Admin/` | Admin Form Requests (login, passwords, users, settings) | M2 |
 | `app/Http/Requests/Admin/Content/` | `{Module}Request` base (rules + payload()) with Store/Update subclasses; StoreGalleryImagesRequest, UpdateGalleryImageRequest, ReorderRequest, ImageRules | M3 |
 | `app/Policies/` | UserPolicy; ContentPolicy base + Package/AddOn/Amenity/GalleryImage/Faq policies (owner only) | M2/M3 |
 | `app/Providers/AppServiceProvider.php` | Service singletons (+ ImageManager GD) + gates (manage-settings, manage-users, manage-content, view-financials) | M2/M3 |
-| `app/Services/` | Business logic (see Services Index); `Content/` = content modules + images | M2/M3 |
+| `app/Services/` | Business logic (see Services Index); `Content/` = content modules + images; `Booking/` = availability, pricing, booking lifecycle, blocked dates | M2/M3/M4 |
 | `app/Models/Concerns/AdminListable.php` | search() ILIKE, whereState(), adminLabel(), adminSearchColumns() | M3 |
 | `app/Models/Contracts/GuardsDeletion.php` | deletionBlockedReason() | M3 |
 | `app/Support/AmenityIcons.php` | Curated heroicons for the amenity picker | M3 |
@@ -77,7 +84,7 @@
 | `resources/js/app.js` | Alpine + focus plugin bootstrap; registers `sortable` | M0/M3 |
 | `resources/js/sortable.js` | Alpine drag-and-drop/keyboard reorder → PATCH {ids} | M3 |
 | `resources/views/layouts/` | `public.blade.php` (guest site), `admin.blade.php` (sidebar/drawer, `$nav` array, account menu), `auth.blade.php` (login / change password) | M0/M2 |
-| `resources/views/admin/` | `dashboard`, `auth/{login,change-password}`, `users/{index,create,edit}`, `settings/edit`; `{packages,add-ons,amenities,faqs}/{index,create,edit,_form}`, `gallery/{index,create,edit}` (M3) | M2/M3 |
+| `resources/views/admin/` | `dashboard`, `auth/{login,change-password}`, `users/{index,create,edit}`, `settings/edit`; `{packages,add-ons,amenities,faqs}/{index,create,edit,_form}`, `gallery/{index,create,edit}` (M3); `{blocked-dates,pricing-rules}/{index,create,edit,_form}` (M4) | M2/M3/M4 |
 | `storage/app/public/{gallery,amenities}/{originals,large,thumbs}/` | Uploaded content images (D-018; not in git) | M3 |
 | `resources/views/partials/` | `head` (meta, vite, styles stack), `admin-sidebar` (nav list) | M0 |
 | `resources/views/components/ui/` | Shared UI components (x-ui.*) | M0 |
@@ -85,12 +92,16 @@
 | `resources/views/home.blade.php` | Temporary landing page (replace in M5) | M0 |
 | `resources/views/design-preview.blade.php` | Component gallery, local only (remove M9) | M0 |
 | `routes/web.php` | Web routes | M0 |
+| `routes/console.php` | Schedule: bookings:expire-stale every 15 min | M4 |
 | `tests/Feature/SmokeTest.php` | Boot/home/design-preview guard tests | M0 |
 | `tests/Feature/Models/` | FactoriesTest, BookingScopesTest (overlap edge cases), PostgresCompatibilityTest (lowercase emails, jsonb) | M1/M0.1 |
 | `tests/Feature/SeederTest.php` | Seed data, idempotency, owner env guard | M1 |
 | `tests/Feature/Admin/` | AuthTest, AccessControlTest, UsersTest, SettingsTest, DashboardTest | M2 |
 | `tests/Feature/Services/` | SettingServiceTest, ContentServiceTest (reorder, image paths) | M2/M3 |
 | `tests/Feature/Admin/Content/` | PackagesTest, AddOnsTest, AmenitiesTest, GalleryTest, FaqsTest, ContentAccessTest | M3 |
+| `tests/Feature/Booking/` | AvailabilityServiceTest, PricingServiceTest, ReferenceCodeGeneratorTest, BookingServiceTest (lock, constraint, transitions, reschedule), ExpireStaleBookingsTest | M4 |
+| `tests/Feature/Admin/Booking/` | BlockedDatesTest, PricingRulesTest | M4 |
+| `tests/Pest.php` | Helpers dayPackage(), nightPackage(), fullDayPackage(), bookingData() | M4 |
 | `tests/Unit/` | MoneyTest, EnumsTest | M1 |
 
 ## Routes Table
@@ -115,6 +126,8 @@
 | resource | `/admin/faqs` (except show) | admin.faqs.* | Admin\FaqController | + role:owner | M3 |
 | PATCH | `/admin/{packages,amenities,gallery,faqs}/reorder` (JSON `{ids}`; declared before resources) | admin.{module}.reorder | {Module}Controller@reorder | + role:owner | M3 |
 | PATCH | `/admin/gallery/{gallery}/visibility` | admin.gallery.toggle-visibility | Admin\GalleryController@toggleVisibility | + role:owner | M3 |
+| resource | `/admin/blocked-dates` (except show; param `{blocked_date}`) | admin.blocked-dates.* | Admin\BlockedDateController (index ?status=past|all, default upcoming) | + role:owner | M4 |
+| resource | `/admin/pricing-rules` (except show; param `{pricing_rule}`) | admin.pricing-rules.* | Admin\PricingRuleController (index ?quote_package=&quote_date= quote check) | + role:owner | M4 |
 
 ## Database Tables
 | Table | Key columns | Relations | Milestone |
@@ -123,7 +136,7 @@
 | packages | code UK, base_price_cents, start_time, end_time, crosses_midnight, max_pax, is_active, sort_order | → bookings (restrict), pricing_rules (cascade) | M1 |
 | add_ons | price_cents, is_active | → booking_add_ons (restrict) | M1 |
 | pricing_rules | package_id?, type, starts_on, ends_on, days_of_week json, adjustment_type, adjustment_value, priority | package (null = global) | M1 |
-| bookings | reference_code UK, package_id, starts_at, ends_at, total_amount_cents, downpayment_required_cents, status, approved_by; soft deletes; IDX (starts_at,ends_at), status, guest_phone | package, approver, booking_add_ons, payments | M1 |
+| bookings | reference_code UK, package_id, starts_at, ends_at, total_amount_cents, downpayment_required_cents, status, approved_by; soft deletes; IDX (starts_at,ends_at), status, guest_phone; EXCLUDE `bookings_no_overlap` (D-021, M4) | package, approver, booking_add_ons, payments | M1/M4 |
 | booking_add_ons | booking_id, add_on_id (UK pair), quantity, unit_price_cents | booking (cascade), add_on (restrict) | M1 |
 | payments | booking_id, type, amount_cents, proof_path, status, reference_no, verified_by | booking (cascade), verifier (set null) | M1 |
 | blocked_dates | starts_at, ends_at, reason, created_by | creator (set null) | M1 |
@@ -142,10 +155,10 @@ Full dictionary + ERD: `docs/database.md`.
 | Package | bookings, pricingRules | active(), ordered(); formatted_price; AdminListable (name, code, description); GuardsDeletion (any booking incl. trashed) | M1/M3 |
 | AddOn | bookings (belongsToMany via BookingAddOn) | active(); formatted_price; AdminListable (name, description); GuardsDeletion (any booking_add_ons row) | M1/M3 |
 | BookingAddOn (Pivot) | booking, addOn | line_total_cents, formattedLineTotal() | M1 |
-| PricingRule | package | active(), forPackage($id) | M1 |
+| PricingRule | package | active(), forPackage($id); AdminListable (name) | M1/M4 |
 | Booking | package, approver (User), addOns (pivot quantity/unit_price_cents), payments | active() (pending+approved), overlapping($s,$e), status($enum); formatted_total, formatted_downpayment; guest_email mutator lowercases (D-014); SoftDeletes | M1 |
 | Payment | booking, verifier (User) | verified(); formatted_amount | M1 |
-| BlockedDate | creator (User) | overlapping($s,$e) | M1 |
+| BlockedDate | creator (User) | overlapping($s,$e); AdminListable (reason; label = reason + date); isWholeDays() | M1/M4 |
 | Amenity | — | active(), ordered(); AdminListable (name, description); imageUrl(ImageVariant) | M1/M3 |
 | GalleryImage | — | visible(), ordered(); AdminListable (caption; state column is_visible; label = caption or "Image #id"); imageUrl(ImageVariant) | M1/M3 |
 | Faq | — | active(), ordered(); AdminListable (question, answer; label = question ≤60 chars) | M1/M3 |
@@ -162,7 +175,7 @@ Full dictionary + ERD: `docs/database.md`.
 | PricingRuleType | weekend, holiday, season; label() | M1 |
 | PricingAdjustmentType | percent (whole % points), fixed (signed centavos); label() | M1 |
 | GalleryCategory | pools, rooms, hall, events; label() | M1 |
-| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated, content.created/updated/deleted/reordered (M3); label(); add cases per module | M2/M3 |
+| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated, content.created/updated/deleted/reordered (M3), booking.created/status_changed/rescheduled/expired (M4); label(); add cases per module | M2/M3/M4 |
 | ImageVariant | originals, large (1600), thumbs (480); maxEdge() (D-018) | M3 |
 | SettingGroup | general, booking, payment, contact, social; label(), icon(), fields() = settings registry (D-017) | M2 |
 
@@ -177,6 +190,12 @@ Full dictionary + ERD: `docs/database.md`.
 | Content\ImageService | store(UploadedFile, dir) → original path, delete(?path), static variantPath(path, ImageVariant), static url(?path, ImageVariant) (D-018) | M3 |
 | Content\AmenityService | create(data, ?image), update(amenity, data, ?image, removeImage), delete(amenity) | M3 |
 | Content\GalleryService | upload(files, GalleryCategory, ?caption, visible) → list, update, toggleVisibility, delete | M3 |
+| Booking\AvailabilityService | resolveWindow(Package, CarbonInterface $date): array{starts_at: CarbonImmutable, ends_at: CarbonImmutable}; isAvailable(CarbonInterface $start, CarbonInterface $end, ?int $ignoreBookingId = null): bool; conflicts($start, $end, ?$ignoreBookingId): array{bookings, blocks}; unavailableDates(CarbonInterface $from, CarbonInterface $to, ?Package $package = null): array<Y-m-d, array{available: bool, packages: array<int, bool>}>; isWithinBookingWindow(CarbonInterface $start, ?CarbonInterface $now = null): bool | M4 |
+| Booking\PricingService | quote(Package, CarbonInterface $date, array $addOns = [id => qty], int $guestCount = 1): PriceBreakdown (@throws GuestCountExceeded, InvalidAddOn); matchingRules(Package, CarbonInterface): Collection<PricingRule>; applyRule(int $amountCents, PricingRule): int; static percentOf(int $cents, int $percent): int; ruleLabel(PricingRule): string | M4 |
+| Booking\PriceBreakdown | readonly: packageId, date, guestCount, basePriceCents, adjustments[{rule_id,label,delta_cents,running_cents}], packageSubtotalCents, addOns[{add_on_id,name,quantity,unit_price_cents,line_total_cents}], addOnsTotalCents, totalCents, downpaymentPercent, downpaymentRequiredCents; toArray() | M4 |
+| Booking\ReferenceCodeGenerator | generate(CarbonInterface $startsAt): string (@throws ReferenceCodeExhausted); static pattern(): string; constants PREFIX, ALPHABET, RANDOM_LENGTH, MAX_ATTEMPTS | M4 |
+| Booking\BookingService | create(array $data, ?User $actor = null): Booking (@throws PackageUnavailable, SlotUnavailable, GuestCountExceeded, InvalidAddOn, ReferenceCodeExhausted); transition(Booking, BookingStatus $to, ?User $actor, ?string $reason = null): Booking (@throws InvalidStatusTransition); canTransition(Booking, BookingStatus): bool; reschedule(Booking, CarbonInterface $newDate, ?User $actor, ?Package $newPackage = null, bool $reprice = false): Booking (@throws InvalidStatusTransition, PackageUnavailable, SlotUnavailable, GuestCountExceeded, InvalidAddOn); expireStale(?CarbonInterface $now = null, bool $dryRun = false): int; const TRANSITIONS, BOOKING_LOCK_KEY | M4 |
+| Booking\BlockedDateService | create(array $data, User $actor): array{block, conflicts}; update(BlockedDate, array): array{block, conflicts}; delete(BlockedDate); overlappingBookings(BlockedDate): Collection<Booking> | M4 |
 
 ## Blade Components
 | Tag | Props | Used in | Milestone |
@@ -222,6 +241,7 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 ## Scheduled Commands & Jobs
 | Command/Job | Schedule | Purpose | Milestone |
 |---|---|---|---|
+| `bookings:expire-stale {--dry-run}` | every 15 min, withoutOverlapping (routes/console.php) | Cancel unpaid pending bookings after `booking.pending_hold_hours` (D-024) | M4 |
 
 ## Notifications & Mail Templates
 | Class | Channel(s) | Trigger | Template | Milestone |
@@ -244,13 +264,19 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 
 ## Business Flow Summaries
 ### Booking flow
-- _tbd (M4/M5)_
+- Engine (M4): `BookingService::create()` → advisory lock → package active? → `resolveWindow` → `isAvailable` → `PricingService::quote` (pax, add-ons) → insert pending booking + `booking_add_ons` snapshot + reference code → `booking.created` log. Public 3-step form + proof upload arrive in M5; admin walk-ins/approval UI in M6.
 ### Status lifecycle
-- States (M1 enum): pending → approved → completed; pending → rejected | cancelled; approved → cancelled. Proof upload keeps `pending` (payment status tracks verification). Transition guard in BookingService (M4).
+- `BookingService::TRANSITIONS`: pending → approved | rejected | cancelled; approved → completed | cancelled; rejected, cancelled, completed are final. Proof upload keeps `pending` (payment status tracks verification).
+- Preconditions: rejected needs a reason (stored in rejection_reason); approved stamps approved_by/approved_at; completed only after `ends_at`. Only pending/approved bookings hold the slot and can be rescheduled.
+- Every change: `booking.status_changed` activity (from, to, reason) + `BookingStatusChanged` event after commit; expiry uses `booking.expired` with actor null (D-024).
 ### Pricing
-- _tbd (M4)_ Data ready (M1): packages.base_price_cents, pricing_rules (priority asc), booking_add_ons.unit_price_cents snapshot.
+- `PricingService::quote()` (D-022): base_price_cents → matching active rules in priority asc (ties by id), each on the running price (percent compounds, half-away-from-zero centavo rounding, floor 0) → + add-ons × qty at current price → total; downpayment = round half up(total × downpayment_percent / 100).
+- Example Day ₱7,000 on a summer Saturday: +10% weekend → ₱7,700; +₱1,000 summer → ₱8,700; + videoke ₱500 → ₱9,200; downpayment 50% ₱4,600.
+- Guest count must be 1..package max_pax; add-ons must be active, qty 1..99. Booking stores totals + add-on unit prices (snapshot).
 ### Availability
-- Unavailable if any `Booking::active()->overlapping(S, E)` or `BlockedDate::overlapping(S, E)` (M1 scopes; half-open, D-009). Service + locking in M4.
+- `AvailabilityService`: a package's window on date D = D@start_time → D@end_time (+1 day when crosses_midnight). Unavailable if any `Booking::active()->overlapping(S, E)` (pending/approved, not soft-deleted) or `BlockedDate::overlapping(S, E)`; half-open, so Day 07–17 and Night 19–05 share a date and a Night ending 05:00 does not block the next Day; 24-Hour conflicts with both.
+- Calendar: `unavailableDates()` = two queries + in-memory check per day per active package. Booking window (lead time, max advance) via `isWithinBookingWindow()`.
+- Writes are serialized by the advisory lock and backed by the exclusion constraint (D-021).
 
 ## Known Issues / TODO
 - Resolved in M0.1: local MariaDB was unusable, so the project moved to PostgreSQL (D-014); schema verified with migrate:fresh --seed, rollback and re-migrate on PostgreSQL 18. (M0/M1/M0.1)
@@ -259,6 +285,9 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 - Public nav links are `#` placeholders until routes exist (M5). Admin nav lists built modules only; add Bookings/Content/Reports entries to `$nav` in layouts/admin.blade.php as they ship. (M0/M2)
 - No self-service "forgot password" email yet; owner resets passwords (D-015). Revisit in M8. (M2)
 - Dashboard charts/occupancy deferred to M7. (M2)
+- Production needs the scheduler cron (`* * * * * php artisan schedule:run`) for booking expiry (D-024). (M4)
+- Exclusion constraint does not cover blocked dates; only the service check does. (M4)
+- Pricing-rule form preview (Alpine) mirrors `applyRule()` for one rule; keep both in sync if the formula changes. (M4)
 - Remove `/design-preview` route + view in M9 (D-007). (M0)
 - Drag-and-drop/icon picker JS verified by markup + endpoint tests only (no browser test run in M3); check manually in Chrome. (M3)
 - Original uploads keep EXIF (possibly GPS) and are publicly reachable by UUID URL; only resized WebP variants are linked. Consider stripping/not keeping originals in M9. (M3)

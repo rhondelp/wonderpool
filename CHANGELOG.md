@@ -15,6 +15,28 @@ ENTRY TEMPLATE
 
 ## Unreleased
 
+## [M4] Booking engine - 2026-10-01
+### Added
+- AvailabilityService: windows incl. midnight crossing, half-open overlap checks vs active bookings and blocked dates, conflicts(), two-query calendar map, booking-window check (files: app/Services/Booking/AvailabilityService.php)
+- PricingService + PriceBreakdown: rules stacked by priority on the running price, add-ons, max_pax, centavo rounding, downpayment (files: app/Services/Booking/PricingService.php, app/Services/Booking/PriceBreakdown.php)
+- ReferenceCodeGenerator WP-YYMM-XXXX (files: app/Services/Booking/ReferenceCodeGenerator.php)
+- BookingService: create (advisory lock, re-check, price snapshot), transition (central map, reasons, approval stamp, completion guard, event), reschedule (re-check, optional reprice), expireStale (files: app/Services/Booking/BookingService.php)
+- Booking exceptions and BookingStatusChanged event (files: app/Exceptions/Booking/*.php, app/Events/BookingStatusChanged.php)
+- Exclusion constraint bookings_no_overlap (files: database/migrations/2026_10_01_001500_add_booking_overlap_exclusion_constraint.php)
+- Command bookings:expire-stale scheduled every 15 minutes (files: app/Console/Commands/ExpireStaleBookings.php, routes/console.php)
+- Admin Blocked dates (whole-day or exact range, overlap warning) and Pricing rules (live sample preview, quote checker) with Form Requests, policies, nav entries (files: app/Http/Controllers/Admin/{BlockedDate,PricingRule}Controller.php, app/Http/Requests/Admin/Content/{,Store,Update}{BlockedDate,PricingRule}Request.php, app/Policies/{BlockedDate,PricingRule}Policy.php, app/Services/Booking/BlockedDateService.php, resources/views/admin/{blocked-dates,pricing-rules}/*.blade.php, resources/views/layouts/admin.blade.php, routes/web.php)
+- ActivityAction booking.created/status_changed/rescheduled/expired (files: app/Enums/ActivityAction.php)
+- Tests: availability, pricing, reference codes, booking service (advisory-lock wait, stale pre-check, constraint + translation, full transition matrix, reschedule), expiry command, admin modules (files: tests/Feature/Booking/*.php, tests/Feature/Admin/Booking/*.php, tests/Pest.php)
+### Changed
+- BlockedDate and PricingRule use AdminListable (files: app/Models/BlockedDate.php, app/Models/PricingRule.php)
+- BookingFactory default bookings get distinct far-future days (no accidental overlaps under the constraint) (files: database/factories/BookingFactory.php)
+- Docs: scheduler cron, admin guide for pricing rules and blocked dates (files: docs/deployment.md, docs/admin-guide.md)
+### DB: added 2026_10_01_001500_add_booking_overlap_exclusion_constraint (reversible)
+### Routes: added admin.blocked-dates.*, admin.pricing-rules.* (resources except show)
+### Breaking / Notes
+- Run `php artisan migrate`; it fails if the database already holds overlapping pending/approved bookings (none in seed data).
+- Production must run the Laravel scheduler (cron `schedule:run` every minute).
+
 ## [M3] Content modules - 2026-10-01
 ### Added
 - Owner-only admin CRUD for packages, add-ons, amenities, gallery, FAQs: index with ILIKE search, active/inactive filter, pagination, empty states, confirm-delete modal, success/warning flashes (files: app/Http/Controllers/Admin/{Package,AddOn,Amenity,Gallery,Faq}Controller.php, resources/views/admin/{packages,add-ons,amenities,gallery,faqs}/*.blade.php, routes/web.php)

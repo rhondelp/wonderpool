@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Database\Factories\BlockedDateFactory;
 use DateTimeInterface;
+use App\Models\Concerns\AdminListable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,6 +24,8 @@ use Illuminate\Support\Carbon;
  */
 class BlockedDate extends Model
 {
+    use AdminListable;
+
     /** @use HasFactory<BlockedDateFactory> */
     use HasFactory;
 
@@ -45,6 +48,32 @@ class BlockedDate extends Model
             'starts_at' => 'datetime',
             'ends_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Columns matched by the admin search box (ILIKE).
+     *
+     * @return list<string>
+     */
+    public static function adminSearchColumns(): array
+    {
+        return ['reason'];
+    }
+
+    /**
+     * Reason and start date, e.g. "Pool maintenance (Dec 5, 2026)".
+     */
+    public function adminLabel(): string
+    {
+        return "{$this->reason} ({$this->starts_at->format('M j, Y')})";
+    }
+
+    /**
+     * Whether the block covers whole days (midnight to midnight).
+     */
+    public function isWholeDays(): bool
+    {
+        return $this->starts_at->format('H:i:s') === '00:00:00' && $this->ends_at->format('H:i:s') === '00:00:00';
     }
 
     /**

@@ -21,6 +21,11 @@ Owner only. Every list has a search box (not case-sensitive) and an Active/Inact
 - **Amenities:** name, description, icon (type to search the icon list), optional photo, active.
 - **Gallery:** Upload images → pick up to 20 JPG/PNG/WebP files (5 MB each), a category and an optional caption. Use Hide/Show to control what guests see, Edit to change caption or category.
 - **FAQs:** question, answer, active.
+## Pricing rules & blocked dates (owner only)
+- **Pricing rules** change the package price on certain days. Weekend rules need the days (e.g. Sat, Sun); holiday and season rules need dates. Value is a whole percent (e.g. 10 or -15) or pesos (e.g. 1000). Several matching rules all apply, lowest priority number first. The form shows a sample price; "Quote check" on the list shows the full price for any package and date. Changes never affect existing bookings.
+- **Blocked dates** close the resort (maintenance, private use). Choose whole days or an exact time range. Existing bookings are not cancelled: if any overlap you will see their references so you can contact the guests.
+- Unpaid pending bookings are cancelled automatically after the pending hold time (Settings → Booking rules) if no payment proof was uploaded.
+
 ## Reports & activity logs
 ## Settings
 - Owner only. Tabs: General, Booking rules (downpayment %, pending hold, lead time, max advance days), Payment instructions, Contact, Social links. Every change is recorded in the activity log.
