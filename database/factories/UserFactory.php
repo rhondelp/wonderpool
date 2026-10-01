@@ -2,7 +2,9 @@
 
 namespace Database\Factories;
 
+use App\Enums\UserRole;
 use App\Models\User;
+use Database\Factories\Concerns\PhilippineData;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -12,25 +14,47 @@ use Illuminate\Support\Str;
  */
 class UserFactory extends Factory
 {
+    use PhilippineData;
+
     /**
      * The current password being used by the factory.
      */
     protected static ?string $password;
 
     /**
-     * Define the model's default state.
+     * Staff user by default.
      *
      * @return array<string, mixed>
      */
     public function definition(): array
     {
+        $name = $this->phName();
+
         return [
-            'name' => fake()->name(),
-            'email' => fake()->unique()->safeEmail(),
+            'name' => $name,
+            'email' => $this->phEmail($name),
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
+            'role' => UserRole::Staff,
+            'is_active' => true,
             'remember_token' => Str::random(10),
         ];
+    }
+
+    /**
+     * Owner (full access) role.
+     */
+    public function owner(): static
+    {
+        return $this->state(fn () => ['role' => UserRole::Owner]);
+    }
+
+    /**
+     * Disabled account.
+     */
+    public function inactive(): static
+    {
+        return $this->state(fn () => ['is_active' => false]);
     }
 
     /**
@@ -38,8 +62,6 @@ class UserFactory extends Factory
      */
     public function unverified(): static
     {
-        return $this->state(fn (array $attributes) => [
-            'email_verified_at' => null,
-        ]);
+        return $this->state(fn () => ['email_verified_at' => null]);
     }
 }

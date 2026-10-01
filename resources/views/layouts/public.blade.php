@@ -19,7 +19,7 @@
         <nav class="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6 lg:px-8" aria-label="Main">
             <a href="{{ url('/') }}" class="flex items-center gap-2 text-lg font-semibold text-pool-800">
                 <x-heroicon-o-sun class="h-7 w-7 text-garden-500" aria-hidden="true" />
-                <span>Wonderpool <span class="text-garden-600">Garden</span></span>
+                <span>Wonderpool <span class="text-garden-700">Garden</span></span>
             </a>
 
             <div class="hidden items-center gap-6 text-sm font-medium md:flex">

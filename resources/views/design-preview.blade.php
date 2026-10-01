@@ -10,7 +10,7 @@
     $pool = ['bg-pool-50', 'bg-pool-100', 'bg-pool-200', 'bg-pool-300', 'bg-pool-400', 'bg-pool-500', 'bg-pool-600', 'bg-pool-700', 'bg-pool-800', 'bg-pool-900', 'bg-pool-950'];
     $garden = ['bg-garden-50', 'bg-garden-100', 'bg-garden-200', 'bg-garden-300', 'bg-garden-400', 'bg-garden-500', 'bg-garden-600', 'bg-garden-700', 'bg-garden-800', 'bg-garden-900', 'bg-garden-950'];
     $shades = [50, 100, 200, 300, 400, 500, 600, 700, 800, 900, 950];
-    $statuses = ['pending', 'awaiting_payment', 'confirmed', 'checked_in', 'completed', 'cancelled', 'rejected', 'no_show', 'unpaid', 'partial', 'paid', 'refunded'];
+    $statuses = [...\App\Enums\BookingStatus::cases(), ...\App\Enums\PaymentStatus::cases(), ...\App\Enums\UserRole::cases()];
 @endphp
 
 @section('content')

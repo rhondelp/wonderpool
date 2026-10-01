@@ -22,31 +22,31 @@
     --font-sans: 'Poppins', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
 
-    /* Pool — blue/aqua: primary actions, links, headers. */
-    --color-pool-50: #eefbfd;
-    --color-pool-100: #d4f3f9;
-    --color-pool-200: #aee7f3;
-    --color-pool-300: #76d4ea;
-    --color-pool-400: #37b8d9;
-    --color-pool-500: #1b9bbf;
-    --color-pool-600: #197ca1;
-    --color-pool-700: #1b6483;
-    --color-pool-800: #1f536c;
-    --color-pool-900: #1e465c;
-    --color-pool-950: #0f2d3e;
+    /* Pool (PLAN.md §7, cyan): links, accents. Filled buttons use pool-700 so white text meets AA (D-008). */
+    --color-pool-50: #ecfeff;
+    --color-pool-100: #cffafe;
+    --color-pool-200: #a5f3fc;
+    --color-pool-300: #67e8f9;
+    --color-pool-400: #22d3ee;
+    --color-pool-500: #06b6d4;
+    --color-pool-600: #0891b2;
+    --color-pool-700: #0e7490;
+    --color-pool-800: #155e75;
+    --color-pool-900: #164e63;
+    --color-pool-950: #083344;
 
-    /* Garden — green: secondary accents, success states. */
-    --color-garden-50: #effaf2;
-    --color-garden-100: #d8f3df;
-    --color-garden-200: #b4e6c3;
-    --color-garden-300: #82d19f;
-    --color-garden-400: #4fb577;
-    --color-garden-500: #2d9a5b;
-    --color-garden-600: #1f7c48;
-    --color-garden-700: #1a633c;
-    --color-garden-800: #184f32;
-    --color-garden-900: #15412b;
-    --color-garden-950: #0a2418;
+    /* Garden (PLAN.md §7, green): secondary/success accents. White text needs garden-700+ (D-008). */
+    --color-garden-50: #f0fdf4;
+    --color-garden-100: #dcfce7;
+    --color-garden-200: #bbf7d0;
+    --color-garden-300: #86efac;
+    --color-garden-400: #4ade80;
+    --color-garden-500: #22c55e;
+    --color-garden-600: #16a34a;
+    --color-garden-700: #15803d;
+    --color-garden-800: #166534;
+    --color-garden-900: #14532d;
+    --color-garden-950: #052e16;
 }
 
 @layer base {

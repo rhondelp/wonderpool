@@ -3,7 +3,7 @@
 | ID | Phase | Title | Status | Date done | Commit hash |
 |---|---|---|---|---|---|
 | M0 | 0 | Setup | Done | 2026-10-01 | 7c42f4f |
-| M1 | 1 | Data layer | Not started | | |
+| M1 | 1 | Data layer | Done | 2026-10-01 | e1e0b27 |
 | M2 | 2 | Admin foundation | Not started | | |
 | M3 | 3 | Content modules | Not started | | |
 | M4 | 4 | Booking engine | Not started | | |
@@ -29,6 +29,39 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 -->
 
 # Reports
+
+## M1 Data layer (Done 2026-10-01, commit e1e0b27)
+**Goal:** Full schema, models, enums, factories and seeders per PLAN.md §4, ready for services.
+**Delivered:**
+- 7 string-backed enums with label()/color(); Money helper (centavos, D-001)
+- 13 migrations (users alter + 12 tables) with explicit FK delete rules and indexes; reversible
+- 13 models with casts, relationships, PHPDoc @property blocks, scopes (`Booking::active()`, `Booking::overlapping()`, etc.) and ₱ accessors
+- Factories for every model with PH names and +639 mobiles; booking states (approved/rejected/cancelled/completed/forPackageOn/window)
+- Seeders: owner from .env, 3 PLAN packages, 8 amenities, 12 settings, 6 FAQs (all idempotent)
+- docs/database.md ERD (Mermaid) + table dictionary
+- Theme palette and badge statuses aligned with PLAN.md §7 (AA-safe primary)
+**Files created / modified:**
+- Enums/helpers: app/Enums/*.php, app/Support/Money.php, config/wonderpool.php
+- Models: app/Models/{User,Package,AddOn,BookingAddOn,PricingRule,Booking,Payment,BlockedDate,Amenity,GalleryImage,Faq,Setting,ActivityLog}.php
+- DB: database/migrations/2026_10_01_*.php, database/factories/*.php, database/factories/Concerns/PhilippineData.php, database/seeders/*.php
+- Tests: tests/Feature/Models/{FactoriesTest,BookingScopesTest}.php, tests/Feature/SeederTest.php, tests/Unit/{MoneyTest,EnumsTest}.php, tests/Pest.php
+- UI alignment: resources/css/app.css, components/ui/{button,badge}.blade.php, partials/head.blade.php, home.blade.php, layouts/public.blade.php, design-preview.blade.php
+- Docs/env: docs/database.md, .env.example
+**DB changes:** users (+role, +is_active); new packages, add_ons, pricing_rules, bookings, booking_add_ons, payments, blocked_dates, amenities, gallery_images, faqs, settings, activity_logs.
+**Routes:** none
+**How to verify:** set OWNER_EMAIL/OWNER_PASSWORD in .env → `php artisan migrate:fresh --seed`; `vendor/bin/pest` (57 tests: FactoriesTest, BookingScopesTest incl. "does not treat touching boundaries as overlaps", SeederTest, MoneyTest, EnumsTest); `vendor/bin/phpstan analyse`; /design-preview shows enum badges. Verified on MariaDB 10.4: migrate:fresh --seed, full rollback, re-migrate.
+**Key decisions:** D-001 (updated), D-003, D-004 (finalized), D-008 (AA 700 shades), D-009 (local time, half-open windows), D-010 (string enums), D-011 (FK delete rules), D-012 (settings/owner env), D-013 (E.164 phones).
+**Edit entry points (where to change things later):**
+- To change what counts as "occupying" the resort, edit `app/Enums/BookingStatus.php` (`blocking()`).
+- To change overlap semantics, edit `app/Models/Booking.php` (`scopeOverlapping`) and `app/Models/BlockedDate.php` (`scopeOverlapping`).
+- To change status labels/badge colors, edit `app/Enums/*Status.php` (`label()`, `color()`).
+- To change money formatting, edit `app/Support/Money.php` (`format`).
+- To change default packages/settings/FAQs/amenities, edit `database/seeders/{Package,Setting,Faq,Amenity}Seeder.php`.
+- To change sample data, edit `database/factories/Concerns/PhilippineData.php`.
+**Known limitations / follow-ups:**
+- Local XAMPP MariaDB still broken; run `php artisan migrate --seed` on the real DB once fixed.
+- Contact/payment/social settings and Day package hours/pax are placeholders pending owner answers (PLAN.md §14).
+- Transition rules, availability service, pricing and reference-code generator are M4.
 
 ## M0 Setup (Done 2026-10-01, commit 7c42f4f)
 **Goal:** Laravel project, tooling, design tokens and base layouts ready for feature work.

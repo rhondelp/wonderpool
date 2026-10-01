@@ -20,7 +20,7 @@
 
 @php
     $variants = [
-        'primary' => 'bg-pool-600 text-white hover:bg-pool-700 focus-visible:ring-pool-500',
+        'primary' => 'bg-pool-700 text-white hover:bg-pool-800 focus-visible:ring-pool-600',
         'secondary' => 'bg-white text-pool-800 ring-1 ring-inset ring-pool-200 hover:bg-pool-50 focus-visible:ring-pool-500',
         'danger' => 'bg-rose-600 text-white hover:bg-rose-700 focus-visible:ring-rose-500',
         'ghost' => 'bg-transparent text-pool-700 hover:bg-pool-50 focus-visible:ring-pool-500',
