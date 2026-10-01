@@ -10,9 +10,11 @@
 
 ## First deployment
 ## Environment configuration
+- Optional bot protection: set `TURNSTILE_ENABLED=true`, `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` (Cloudflare dashboard) in `.env` (D-028). Keys never go in git.
 ## Scheduler & queue workers
 - Cron (required since M4, booking expiry): `* * * * * cd /path/to/app && php artisan schedule:run >> /dev/null 2>&1`. Check with `php artisan schedule:list`.
 ## Updating / releases
 ## Backups & recovery
+- Back up `storage/app/private/payment-proofs/` (guest payment proofs, never public) together with the database and `storage/app/public/` images.
 
 - Nightly `pg_dump -Fc wonderpool > wonderpool-YYYYMMDD.dump` to off-server storage; restore with `pg_restore -d wonderpool <file>`. Dumps are git-ignored (`*.dump`, `*.backup`) and must never be committed.

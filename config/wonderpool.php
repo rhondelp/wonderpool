@@ -20,4 +20,14 @@ return [
         'password' => env('OWNER_PASSWORD'),
     ],
 
+    /*
+    | Cloudflare Turnstile on public booking forms (D-028). Off by default; when enabled,
+    | set both keys from the Cloudflare dashboard (never commit them).
+    */
+    'turnstile' => [
+        'enabled' => (bool) env('TURNSTILE_ENABLED', false),
+        'site_key' => env('TURNSTILE_SITE_KEY'),
+        'secret_key' => env('TURNSTILE_SECRET_KEY'),
+    ],
+
 ];

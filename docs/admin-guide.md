@@ -27,5 +27,10 @@ Owner only. Every list has a search box (not case-sensitive) and an Active/Inact
 - Unpaid pending bookings are cancelled automatically after the pending hold time (Settings → Booking rules) if no payment proof was uploaded.
 
 ## Reports & activity logs
+## Website content
+- Settings → **Website content**: home headline and sub-headline, about text, highlights (one per line), house rules, cancellation policy and the "what happens next" note guests see after booking. Leave a field blank to hide that section. Use `**bold**` and lines starting with `- ` for lists.
+- Settings → **SEO**: the description Google shows and the image used when the site is shared on Facebook.
+- Settings → **Payment**: the GCash/bank instructions shown when guests book.
+
 ## Settings
 - Owner only. Tabs: General, Booking rules (downpayment %, pending hold, lead time, max advance days), Payment instructions, Contact, Social links. Every change is recorded in the activity log.

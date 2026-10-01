@@ -49,6 +49,10 @@
 | D-022 | 2026-10-01 | Pricing: base → every matching active rule (global or this package; date within [starts_on, ends_on], nulls open; ISO weekday in days_of_week if set) in `priority` asc, then id, each applied to the running package price (percent compounds) → + add-ons (never adjusted). Percent delta rounded half away from zero to the centavo; running price floored at 0; downpayment = round half up of total × `booking.downpayment_percent`. Rules match on the booking's start date. Bookings snapshot totals and add-on unit prices; reschedule keeps the snapshot unless `reprice`. | Owner chose "stack in priority order" (M4 plan). | M4 |
 | D-023 | 2026-10-01 | Reference codes `WP-{YYMM of stay}-{4 chars}` from `ABCDEFGHJKMNPQRSTUVWXYZ23456789` (no 0/O/1/I/L); unique vs all bookings incl. soft-deleted; generated under the booking advisory lock, max 10 attempts. | Readable over the phone; collision-safe. | M4 |
 | D-024 | 2026-10-01 | Pending-hold expiry: `bookings:expire-stale` (every 15 min, withoutOverlapping) cancels `pending` bookings whose `created_at` ≤ now − `booking.pending_hold_hours` and that have no payment with a `proof_path`; logged as `booking.expired` with actor null. Lead time / max advance are checked by guest-facing requests (`AvailabilityService::isWithinBookingWindow`), not by `create()`, so admins can record walk-ins. | PLAN.md §5.3. | M4 |
+| D-025 | 2026-10-01 | Guest identity = reference code + mobile number. Codes compared trimmed/uppercased with inner spaces removed; phones normalized to `+639XXXXXXXXX` by `App\Support\PhoneNumber` before storing and comparing (PostgreSQL is case-sensitive). Wrong code or phone → one generic error. Booking pages `/book/{ref}`, `/book/{ref}/done`, `/track/{ref}` and proof upload are shown only to a browser whose session lists the booking id (`GuestBookingService::SESSION_KEY`, set on create or successful lookup); otherwise 404 / redirect to /track. Guests get lead time / max advance checks in `GuestBookingService::book()`. | PLAN.md §10 (no guessing); no guest accounts. | M5 |
+| D-026 | 2026-10-01 | Payment proofs: jpg/png/webp/pdf ≤ 5 MB (extension + real MIME). Stored ONLY on the private `local` disk at `storage/app/private/payment-proofs/{booking_id}/{uuid}.{jpg|pdf}` (never `public`). Images re-encoded to JPEG q85, longest edge ≤ 2000 px, which drops EXIF/GPS; undecodable images → friendly error. PDFs stored as uploaded (GD cannot re-encode them). One current proof per booking: re-upload replaces the pending downpayment Payment's file (old file deleted after commit); uploads allowed only while the booking is pending; logged `payment.proof_uploaded`. Admin viewing route arrives in M6. | PLAN.md §5.6. | M5 |
+| D-027 | 2026-10-01 | Public content comes only from DB/settings: new SettingGroups `content` (tagline, hero, about, highlights, house rules, cancellation policy, booking success note) and `seo` (meta description, share image; fallback = first visible gallery image). Long owner text rendered by `x-ui.prose` with `Str::markdown(html_input=strip, allow_unsafe_links=false)`. Empty settings/collections hide their section (`x-ui.section :when`). `$site` shared to `layouts.public`, `partials.head`, `public.*` by a view composer. | No hard-coded rates or text; safe owner formatting. | M5 |
+| D-028 | 2026-10-01 | Anti-abuse: named limiters per IP — `booking-read` 60/min (calendar, quote), `booking-write` 5/min + 20/day (POST /book), `proof-upload` 10/min, `track` 10/min (POST /track); honeypot field `website` must be empty; Cloudflare Turnstile behind `config('wonderpool.turnstile.enabled')` (env TURNSTILE_ENABLED, default false) via implicit rule `App\Rules\Turnstile`. The booking page JS only displays server JSON; price/availability are never computed client-side. | PLAN.md §10. | M5 |
 | D-014 | 2026-10-01 | Database engine is PostgreSQL. Switched from MySQL on 2026-10-01 because MySQL does not run on the dev machine. JSON columns are jsonb (no key-order guarantee); emails stored lowercase via User/Booking mutators; booking creation to be serialized with `pg_advisory_xact_lock` (PLAN.md §5.2). | Local MariaDB unusable; PostgreSQL available locally and in CI. | M0.1 |
 
 ## Folder Map
@@ -59,10 +63,13 @@
 | `app/` | Laravel app code | M0 |
 | `app/Enums/` | String-backed enums with label()/color() | M1 |
 | `app/Exceptions/ContentInUseException.php` | Delete refused (message shown to admins) | M3 |
-| `app/Exceptions/Booking/` | BookingException base + SlotUnavailable, GuestCountExceeded, InvalidAddOn, PackageUnavailable, InvalidStatusTransition, ReferenceCodeExhausted (messages safe to show) | M4 |
+| `app/Exceptions/Booking/` | BookingException base + SlotUnavailable, GuestCountExceeded, InvalidAddOn, PackageUnavailable, InvalidStatusTransition, ReferenceCodeExhausted (M4); BookingWindow, PaymentProofNotAllowed, InvalidPaymentProof (M5) — messages safe to show | M4/M5 |
 | `app/Events/BookingStatusChanged.php` | Fired after each committed status change (listeners in M8) | M4 |
 | `app/Console/Commands/ExpireStaleBookings.php` | `bookings:expire-stale {--dry-run}` | M4 |
 | `app/Http/Controllers/Admin/` | Admin controllers; `Auth/` = Login, Password; content: Package, AddOn, Amenity, Gallery, Faq (M3) | M2/M3 |
+| `app/Http/Controllers/Public/` | PageController (pages, sitemap, robots), BookingController (book, calendar, quote, store, payment, proof, done), TrackBookingController | M5 |
+| `app/Http/Requests/Public/` | QuoteRequest, StoreBookingRequest (extends Quote), UploadPaymentProofRequest, TrackBookingRequest | M5 |
+| `app/Rules/` | PhilippineMobile, Turnstile (implicit, off by default) | M5 |
 | `app/Http/Middleware/` | EnsureUserIsActive (`active`), EnsurePasswordIsChanged (`password.changed`), EnsureUserHasRole (`role`); aliases in bootstrap/app.php | M2 |
 | `app/Http/Requests/Admin/` | Admin Form Requests (login, passwords, users, settings) | M2 |
 | `app/Http/Requests/Admin/Content/` | `{Module}Request` base (rules + payload()) with Store/Update subclasses; StoreGalleryImagesRequest, UpdateGalleryImageRequest, ReorderRequest, ImageRules | M3 |
@@ -72,6 +79,7 @@
 | `app/Models/Concerns/AdminListable.php` | search() ILIKE, whereState(), adminLabel(), adminSearchColumns() | M3 |
 | `app/Models/Contracts/GuardsDeletion.php` | deletionBlockedReason() | M3 |
 | `app/Support/AmenityIcons.php` | Curated heroicons for the amenity picker | M3 |
+| `app/Support/PhoneNumber.php` | normalize() → +639XXXXXXXXX, display() (D-025) | M5 |
 | `app/Models/` | Eloquent models (see Models & Relationships) | M1 |
 | `app/Support/Money.php` | Centavo convert/format helpers (D-001) | M1 |
 | `config/app.php` | timezone = env APP_TIMEZONE (Asia/Manila) | M0 |
@@ -83,13 +91,16 @@
 | `resources/css/app.css` | Tailwind v4 entry + `@theme` tokens + Poppins imports (D-002) | M0 |
 | `resources/js/app.js` | Alpine + focus plugin bootstrap; registers `sortable` | M0/M3 |
 | `resources/js/sortable.js` | Alpine drag-and-drop/keyboard reorder → PATCH {ids} | M3 |
-| `resources/views/layouts/` | `public.blade.php` (guest site), `admin.blade.php` (sidebar/drawer, `$nav` array, account menu), `auth.blade.php` (login / change password) | M0/M2 |
+| `resources/js/booking.js` | Alpine `bookingForm`: steps, calendar fetch, debounced quote fetch (display only) | M5 |
+| `resources/views/layouts/` | `public.blade.php` (guest site: `$nav`, footer from `$site`), `admin.blade.php` (sidebar/drawer, `$nav` array, account menu), `auth.blade.php` (login / change password) | M0/M2/M5 |
+| `resources/views/public/` | home, amenities, packages, gallery, faq, contact, policies, sitemap; `book/{index,payment,done,_summary,_proof-form}`; `track/{index,show}` | M5 |
+| `storage/app/private/payment-proofs/{booking_id}/` | Guest payment proofs (private disk, D-026; not in git) | M5 |
 | `resources/views/admin/` | `dashboard`, `auth/{login,change-password}`, `users/{index,create,edit}`, `settings/edit`; `{packages,add-ons,amenities,faqs}/{index,create,edit,_form}`, `gallery/{index,create,edit}` (M3); `{blocked-dates,pricing-rules}/{index,create,edit,_form}` (M4) | M2/M3/M4 |
 | `storage/app/public/{gallery,amenities}/{originals,large,thumbs}/` | Uploaded content images (D-018; not in git) | M3 |
 | `resources/views/partials/` | `head` (meta, vite, styles stack), `admin-sidebar` (nav list) | M0 |
 | `resources/views/components/ui/` | Shared UI components (x-ui.*) | M0 |
+| `resources/views/components/public/` | Public-only components (x-public.*) | M5 |
 | `resources/views/components/admin/` | Admin-only components (x-admin.*) | M0 |
-| `resources/views/home.blade.php` | Temporary landing page (replace in M5) | M0 |
 | `resources/views/design-preview.blade.php` | Component gallery, local only (remove M9) | M0 |
 | `routes/web.php` | Web routes | M0 |
 | `routes/console.php` | Schedule: bookings:expire-stale every 15 min | M4 |
@@ -101,13 +112,26 @@
 | `tests/Feature/Admin/Content/` | PackagesTest, AddOnsTest, AmenitiesTest, GalleryTest, FaqsTest, ContentAccessTest | M3 |
 | `tests/Feature/Booking/` | AvailabilityServiceTest, PricingServiceTest, ReferenceCodeGeneratorTest, BookingServiceTest (lock, constraint, transitions, reschedule), ExpireStaleBookingsTest | M4 |
 | `tests/Feature/Admin/Booking/` | BlockedDatesTest, PricingRulesTest | M4 |
+| `tests/Feature/Public/` | PagesTest, BookingFlowTest, QuoteEndpointTest, TrackBookingTest, AntiAbuseTest | M5 |
+| `tests/Unit/PhoneNumberTest.php` | Phone normalization | M5 |
 | `tests/Pest.php` | Helpers dayPackage(), nightPackage(), fullDayPackage(), bookingData() | M4 |
 | `tests/Unit/` | MoneyTest, EnumsTest | M1 |
 
 ## Routes Table
 | Method | URI | Name | Controller@action | Middleware | Milestone |
 |---|---|---|---|---|---|
-| GET | `/` | home | `Route::view` → `home` | web | M0 |
+| GET | `/` | home | Public\PageController@home | web | M5 |
+| GET | `/amenities`, `/packages`, `/gallery`, `/faq`, `/contact`, `/policies` | amenities, packages, gallery, faq, contact, policies | Public\PageController@{name} | web | M5 |
+| GET | `/sitemap.xml`, `/robots.txt` | sitemap, robots | Public\PageController@sitemap/robots (public/robots.txt removed) | web | M5 |
+| GET | `/book` (?package=) | book | Public\BookingController@create | web | M5 |
+| GET | `/book/availability` (?package_id&month=YYYY-MM) | book.availability | Public\BookingController@availability (JSON) | throttle:booking-read | M5 |
+| POST | `/book/quote` | book.quote | Public\BookingController@quote (JSON) | throttle:booking-read | M5 |
+| POST | `/book` | book.store | Public\BookingController@store | throttle:booking-write | M5 |
+| GET | `/book/{booking:reference_code}` | book.payment | Public\BookingController@payment (session access) | web | M5 |
+| POST | `/book/{booking:reference_code}/payment` | book.payment.store | Public\BookingController@uploadProof (session access; `return=track`) | throttle:proof-upload | M5 |
+| GET | `/book/{booking:reference_code}/done` | book.done | Public\BookingController@done (session access) | web | M5 |
+| GET/POST | `/track` | track / track.lookup | Public\TrackBookingController@create/lookup | POST: throttle:track | M5 |
+| GET | `/track/{booking:reference_code}` | track.show | Public\TrackBookingController@show (session access) | web | M5 |
 | GET | `/design-preview` | design-preview | closure → `design-preview` (local env only; REMOVE IN M9) | web | M0 |
 | GET | `/up` | — | Laravel health check | — | M0 |
 | GET/POST | `/admin/login` | admin.login / admin.login.store | Admin\Auth\LoginController@create/store | guest | M2 |
@@ -175,7 +199,7 @@ Full dictionary + ERD: `docs/database.md`.
 | PricingRuleType | weekend, holiday, season; label() | M1 |
 | PricingAdjustmentType | percent (whole % points), fixed (signed centavos); label() | M1 |
 | GalleryCategory | pools, rooms, hall, events; label() | M1 |
-| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated, content.created/updated/deleted/reordered (M3), booking.created/status_changed/rescheduled/expired (M4); label(); add cases per module | M2/M3/M4 |
+| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated, content.created/updated/deleted/reordered (M3), booking.created/status_changed/rescheduled/expired (M4), payment.proof_uploaded (M5); label(); add cases per module | M2/M3/M4/M5 |
 | ImageVariant | originals, large (1600), thumbs (480); maxEdge() (D-018) | M3 |
 | SettingGroup | general, booking, payment, contact, social; label(), icon(), fields() = settings registry (D-017) | M2 |
 
@@ -196,6 +220,9 @@ Full dictionary + ERD: `docs/database.md`.
 | Booking\ReferenceCodeGenerator | generate(CarbonInterface $startsAt): string (@throws ReferenceCodeExhausted); static pattern(): string; constants PREFIX, ALPHABET, RANDOM_LENGTH, MAX_ATTEMPTS | M4 |
 | Booking\BookingService | create(array $data, ?User $actor = null): Booking (@throws PackageUnavailable, SlotUnavailable, GuestCountExceeded, InvalidAddOn, ReferenceCodeExhausted); transition(Booking, BookingStatus $to, ?User $actor, ?string $reason = null): Booking (@throws InvalidStatusTransition); canTransition(Booking, BookingStatus): bool; reschedule(Booking, CarbonInterface $newDate, ?User $actor, ?Package $newPackage = null, bool $reprice = false): Booking (@throws InvalidStatusTransition, PackageUnavailable, SlotUnavailable, GuestCountExceeded, InvalidAddOn); expireStale(?CarbonInterface $now = null, bool $dryRun = false): int; const TRANSITIONS, BOOKING_LOCK_KEY | M4 |
 | Booking\BlockedDateService | create(array $data, User $actor): array{block, conflicts}; update(BlockedDate, array): array{block, conflicts}; delete(BlockedDate); overlappingBookings(BlockedDate): Collection<Booking> | M4 |
+| Booking\GuestBookingService | calendar(Package, CarbonInterface $month): array{month, label, days: array<Y-m-d, available|booked|closed>, has_previous, has_next}; quote(Package, CarbonInterface $date, int $guestCount, array $addOns = []): array{available, reason, window, breakdown}; book(array $data): Booking (@throws BookingWindow, PackageUnavailable, SlotUnavailable, GuestCountExceeded, InvalidAddOn, ReferenceCodeExhausted); find(string $reference, string $phone): ?Booking; static normalizeReference(string): string; timeline(Booking): list<array{at, label, note, tone}>; remember(Booking); canAccess(Booking): bool; paymentInstructions(): ?string; windowLabel($start, $end): string | M5 |
+| Booking\PaymentProofService | store(Booking, UploadedFile, ?string $referenceNo = null): Payment (@throws PaymentProofNotAllowed, InvalidPaymentProof); constants DISK=local, DIRECTORY, MAX_EDGE, QUALITY (D-026) | M5 |
+| PublicContentService | site(): array{name, tagline, phone, email, address, map_embed_url, facebook_url, instagram_url, meta_description, og_image_url}; text(key): ?string; highlights(): list<string>; packages(); addOns(); amenities(?limit); gallery(?limit); faqs() — active/visible only (D-027) | M5 |
 
 ## Blade Components
 | Tag | Props | Used in | Milestone |
@@ -219,6 +246,12 @@ Full dictionary + ERD: `docs/database.md`.
 | `x-admin.confirm-delete` | action*, label*, name* (unique modal), warning, size | content indexes | M3 |
 | `x-admin.index-filters` | placeholder, states [value=>label]; slot extra filters; GET q/status | content indexes | M3 |
 | `x-admin.icon-picker` | icons* (AmenityIcons::all()), name (icon), selected, label | amenities form | M3 |
+| `x-ui.wave-divider` | flip; color via text-* class (currentColor) | public layout, heroes | M5 |
+| `x-ui.section` | title, intro, id, when (false = render nothing) | public pages | M5 |
+| `x-ui.prose` | text (owner Markdown-lite, HTML stripped; renders nothing when blank) | home, policies, booking, track | M5 |
+| `x-public.page-hero` | title*, subtitle; slot | inner public pages | M5 |
+| `x-public.package-card` | package* | home, packages | M5 |
+| `x-public.amenity-card` | amenity* | home, amenities | M5 |
 
 ## Settings Keys
 Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this table documents them.
@@ -237,6 +270,16 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 | contact.map_embed_url | contact | "" | Google Maps embed URL | M1 |
 | social.facebook_url | social | https://www.facebook.com/ (placeholder) | Facebook page | M1 |
 | social.instagram_url | social | "" | Instagram page | M1 |
+| content.tagline | content | Pools · Gardens · Good times | Footer tagline | M5 |
+| content.hero_title | content | Your private pool and garden escape | Home headline (required) | M5 |
+| content.hero_subtitle | content | (booking pitch) | Home sub-headline | M5 |
+| content.about | content | "" | Home "About" (Markdown-lite; blank hides) | M5 |
+| content.highlights | content | 4 sample lines | One per line, max 6 shown | M5 |
+| content.house_rules | content | PLACEHOLDER rules | Policies page (Markdown-lite) | M5 |
+| content.cancellation_policy | content | "" | Policies page + booking step 3 (blank hides; §14 Q4) | M5 |
+| content.booking_success_note | content | (next steps text) | Success page "What happens next" | M5 |
+| seo.meta_description | seo | (default description) | `<meta name=description>` / og:description | M5 |
+| seo.og_image_url | seo | "" | Share image; blank = first visible gallery photo | M5 |
 
 ## Scheduled Commands & Jobs
 | Command/Job | Schedule | Purpose | Milestone |
@@ -261,10 +304,17 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 | OWNER_NAME | Initial owner display name (OwnerSeeder) | M1 |
 | OWNER_EMAIL | Initial owner login email; seeder skips if empty | M1 |
 | OWNER_PASSWORD | Initial owner password (.env only, never committed); seeder skips if empty; must be changed on first login (D-015) | M1/M2 |
+| TURNSTILE_ENABLED / TURNSTILE_SITE_KEY / TURNSTILE_SECRET_KEY | Cloudflare Turnstile on the booking form; off by default (D-028) | M5 |
 
 ## Business Flow Summaries
 ### Booking flow
-- Engine (M4): `BookingService::create()` → advisory lock → package active? → `resolveWindow` → `isAvailable` → `PricingService::quote` (pax, add-ons) → insert pending booking + `booking_add_ons` snapshot + reference code → `booking.created` log. Public 3-step form + proof upload arrive in M5; admin walk-ins/approval UI in M6.
+1. Guest opens `/book` (optionally `?package=`): packages (active), add-ons, payment instructions, cancellation policy (Public\BookingController@create).
+2. Step 1: picks a package → Alpine fetches `/book/availability` (GuestBookingService::calendar → AvailabilityService::unavailableDates + isWithinBookingWindow: available / booked / closed); picks a date and guest count → debounced POST `/book/quote` (GuestBookingService::quote → AvailabilityService + PricingService::quote()->toArray()) shows window, total and downpayment. Continue is enabled only when the quote says available.
+3. Step 2: name, PH mobile, email, occasion, notes, add-on quantities (each change re-quotes).
+4. Step 3: summary from the last server quote, payment instructions, policy, honeypot, optional Turnstile, terms → normal POST `/book` (StoreBookingRequest) → GuestBookingService::book (lead time / max advance) → BookingService::create (advisory lock, re-check, snapshot, reference code) → booking id remembered in session → redirect `/book/{ref}`. Errors (slot taken, window, pax) redirect back to `/book` with a flash and old input. Without JS the same form shows all steps and posts directly.
+5. `/book/{ref}`: summary + how to pay → upload proof (UploadPaymentProofRequest → PaymentProofService::store, private disk) → `/book/{ref}/done`: reference code (copy button), next steps, track link.
+6. Later: `/track` (code + phone, normalized) → `/track/{ref}`: status, guest-safe timeline (created, proof received, approved/rejected + reason, cancelled/expired, moved, completed), upload/replace proof while pending.
+- Engine (M4): `BookingService::create()` → advisory lock → package active? → `resolveWindow` → `isAvailable` → `PricingService::quote` → insert pending booking + `booking_add_ons` snapshot + reference code → `booking.created` log. Admin approval UI in M6.
 ### Status lifecycle
 - `BookingService::TRANSITIONS`: pending → approved | rejected | cancelled; approved → completed | cancelled; rejected, cancelled, completed are final. Proof upload keeps `pending` (payment status tracks verification).
 - Preconditions: rejected needs a reason (stored in rejection_reason); approved stamps approved_by/approved_at; completed only after `ends_at`. Only pending/approved bookings hold the slot and can be rescheduled.
@@ -282,7 +332,10 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 - Resolved in M0.1: local MariaDB was unusable, so the project moved to PostgreSQL (D-014); schema verified with migrate:fresh --seed, rollback and re-migrate on PostgreSQL 18. (M0/M1/M0.1)
 - Settings contact/payment/social values are placeholders; replace once the owner answers PLAN.md §14 Q5. (M1)
 - Day package hours (7AM–5PM) and Day max pax (50) are proposed defaults pending owner confirmation (PLAN.md §1). (M1)
-- Public nav links are `#` placeholders until routes exist (M5). Admin nav lists built modules only; add Bookings/Content/Reports entries to `$nav` in layouts/admin.blade.php as they ship. (M0/M2)
+- Admin nav lists built modules only; add Bookings/Reports entries to `$nav` in layouts/admin.blade.php as they ship (M6/M7). (M0/M2)
+- Booking page JS (calendar, quote, steps), gallery lightbox and copy button were not run in a real browser in M5 (Chrome extension unavailable); server endpoints/markup are tested. Manual check recommended. (M5)
+- PDF proofs are stored as uploaded (metadata not stripped). (M5)
+- Settings content/house rules/cancellation policy are placeholders until the owner provides them (§14). (M5)
 - No self-service "forgot password" email yet; owner resets passwords (D-015). Revisit in M8. (M2)
 - Dashboard charts/occupancy deferred to M7. (M2)
 - Production needs the scheduler cron (`* * * * * php artisan schedule:run`) for booking expiry (D-024). (M4)

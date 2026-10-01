@@ -7,8 +7,8 @@
 | M1 | 1 | Data layer | Done | 2026-10-01 | e1e0b27 |
 | M2 | 2 | Admin foundation | Done | 2026-10-01 | e2b4c84 |
 | M3 | 3 | Content modules | Done | 2026-10-01 | dd0d451 |
-| M4 | 4 | Booking engine | In review | 2026-10-01 | a8ee111 |
-| M5 | 5 | Public site | Not started | | |
+| M4 | 4 | Booking engine | Done | 2026-10-01 | a8ee111 |
+| M5 | 5 | Public site | In review | 2026-10-01 | d997511 |
 | M6 | 6 | Admin bookings | Not started | | |
 | M7 | 7 | Reports & logs | Not started | | |
 | M8 | 8 | Notifications | Not started | | |
@@ -30,6 +30,40 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 -->
 
 # Reports
+
+## M5 Public site & booking flow (Done 2026-10-01, commit d997511)
+**Goal:** Guests can browse the resort, see real availability, book, upload payment proof and track their booking on mobile and desktop.
+**Delivered:**
+- Public pages: home (hero, highlights, about, amenities, packages, gallery strip, map, CTA), amenities, packages & rates (+ add-ons), gallery (category filter + accessible lightbox), FAQ, contact, policies; all content from DB/settings (new "Website content" and "SEO" settings), empty sections hidden
+- Design: pool/garden gradients (AA-safe 700+ shades under white text), rounded cards, wave dividers, Poppins, mobile-first; lazy images with width/height
+- SEO: per-page title/description, canonical, OG/Twitter tags (share image fallback = first gallery photo), sitemap.xml, robots.txt
+- Booking: 3 steps on one page (Alpine) with month availability calendar and live quotes from the M4 services; server-validated no-JS fallback; payment step with instructions; private proof upload (images re-encoded, metadata stripped; PDF accepted); success page with copy-able reference code and next steps
+- Tracking: reference + mobile (normalized), guest-safe timeline, proof upload/replace while pending; booking pages only for the browser that made/looked up the booking
+- Anti-abuse: per-IP rate limits, honeypot, Turnstile hook (off by default)
+**Files created / modified:**
+- HTTP: app/Http/Controllers/Public/{Page,Booking,TrackBooking}Controller.php, app/Http/Requests/Public/*.php, app/Rules/{PhilippineMobile,Turnstile}.php, routes/web.php, app/Providers/AppServiceProvider.php
+- Services/domain: app/Services/Booking/{GuestBookingService,PaymentProofService}.php, app/Services/PublicContentService.php, app/Support/PhoneNumber.php, app/Exceptions/Booking/{BookingWindow,PaymentProofNotAllowed,InvalidPaymentProof}Exception.php, app/Enums/{SettingGroup,ActivityAction}.php, app/Services/Booking/PriceBreakdown.php, config/wonderpool.php, .env.example
+- Views/JS: resources/views/public/**, resources/views/components/ui/{wave-divider,section,prose}.blade.php, resources/views/components/public/*.blade.php, resources/views/layouts/public.blade.php, resources/views/partials/head.blade.php, resources/js/{booking,app}.js; removed resources/views/home.blade.php, public/robots.txt
+- Tests: tests/Feature/Public/{Pages,BookingFlow,QuoteEndpoint,TrackBooking,AntiAbuse}Test.php, tests/Unit/PhoneNumberTest.php
+- Docs: CHANGELOG.md, HISTORY.md, MILESTONES.md, docs/{admin-guide,deployment}.md
+**DB changes:** none (new settings keys seeded by SettingSeeder).
+**Routes:** home, amenities, packages, gallery, faq, contact, policies, sitemap, robots, book, book.availability, book.quote, book.store, book.payment, book.payment.store, book.done, track, track.lookup, track.show (HISTORY Routes Table).
+**How to verify:** `php artisan db:seed --class=SettingSeeder` → `npm run build` → `php artisan serve` → browse all pages at phone and desktop width; Book → pick a package, see booked days greyed in the calendar, pick a free date (price appears), fill details, add an add-on (price updates), confirm → upload a JPG or PDF → success page shows the code → `/track` with the code in lowercase and `0917…` phone → timeline. Automated: `vendor/bin/pest` (425 tests; tests/Feature/Public/*), `vendor/bin/pint --test`, `vendor/bin/phpstan analyse` (no errors).
+**Key decisions:** D-025 (normalized code/phone + session access), D-026 (private proofs, re-encode, PDF as-is), D-027 (content/SEO settings, safe Markdown-lite), D-028 (rate limits, honeypot, Turnstile flag).
+**Edit entry points (where to change things later):**
+- **Booking steps** (order, what each step shows, step labels): `resources/views/public/book/index.blade.php` (one `<fieldset>` per step, step indicator list at the top) and `resources/js/booking.js` (`go()`, `canContinue`, calendar/quote fetching). Server side of the flow: `app/Http/Controllers/Public/BookingController.php` + `app/Services/Booking/GuestBookingService.php`.
+- **Booking form fields:** add the input to the right fieldset in `resources/views/public/book/index.blade.php`, its rule/message in `app/Http/Requests/Public/StoreBookingRequest.php` (`rules()`, `messages()`, `bookingData()`), and if it must be stored, the column (migration + `Booking::$fillable`) and `BookingService::create()`. Quote-affecting fields also go in `QuoteRequest` and `GuestBookingService::quote()`.
+- **Page sections:** each page is `resources/views/public/{home,amenities,packages,gallery,faq,contact,policies}.blade.php` (home sections are commented blocks using `x-ui.section :when`); their data comes from `app/Http/Controllers/Public/PageController.php` → `app/Services/PublicContentService.php`. Header/footer: `resources/views/layouts/public.blade.php` (`$nav`).
+- **Page text:** Admin → Settings → Website content / SEO (keys in `app/Enums/SettingGroup.php`).
+- **Payment instructions:** Admin → Settings → Payment (`payment.instructions`); shown in booking step 3, the payment page and the tracking page.
+- Proof rules/storage: `app/Http/Requests/Public/UploadPaymentProofRequest.php` (types/size), `app/Services/Booking/PaymentProofService.php` (disk, folder, MAX_EDGE, QUALITY).
+- Rate limits: `AppServiceProvider::boot()` (`RateLimiter::for(...)`); Turnstile: `.env` TURNSTILE_* + `app/Rules/Turnstile.php`.
+- Timeline wording: `GuestBookingService::timeline()` / `statusEntry()`.
+**Known limitations / follow-ups:**
+- The booking page JavaScript (calendar clicks, live quote, step switching), gallery lightbox and copy button were NOT exercised in a real browser (Chrome extension unavailable); endpoints and markup are covered by tests. Please click through once.
+- PDF proofs keep their metadata (cannot re-encode with GD).
+- Content/policy settings hold placeholders until the owner supplies real text (PLAN.md §14).
+- Admin proof viewing and approval UI: M6. Email notifications: M8.
 
 ## M4 Booking engine (Done 2026-10-01, commit a8ee111)
 **Goal:** Availability, pricing, safe booking creation, status lifecycle, pending-hold expiry, and admin management of blocked dates and pricing rules. No public UI.

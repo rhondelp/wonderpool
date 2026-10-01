@@ -13,9 +13,43 @@ use App\Http\Controllers\Admin\PricingRuleController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Enums\SettingGroup;
+use App\Http\Controllers\Public\BookingController;
+use App\Http\Controllers\Public\PageController;
+use App\Http\Controllers\Public\TrackBookingController;
 use Illuminate\Support\Facades\Route;
 
-Route::view('/', 'home')->name('home');
+/*
+| Public site (M5). Content comes from the database/settings (D-027).
+*/
+Route::controller(PageController::class)->group(function () {
+    Route::get('/', 'home')->name('home');
+    Route::get('amenities', 'amenities')->name('amenities');
+    Route::get('packages', 'packages')->name('packages');
+    Route::get('gallery', 'gallery')->name('gallery');
+    Route::get('faq', 'faq')->name('faq');
+    Route::get('contact', 'contact')->name('contact');
+    Route::get('policies', 'policies')->name('policies');
+    Route::get('sitemap.xml', 'sitemap')->name('sitemap');
+    Route::get('robots.txt', 'robots')->name('robots');
+});
+
+/*
+| Guest booking flow + tracking (M5). Named rate limiters in AppServiceProvider (D-028).
+| {booking:reference_code} pages are only shown to the browser that created/looked up the booking (D-025).
+*/
+Route::get('book', [BookingController::class, 'create'])->name('book');
+Route::middleware('throttle:booking-read')->group(function () {
+    Route::get('book/availability', [BookingController::class, 'availability'])->name('book.availability');
+    Route::post('book/quote', [BookingController::class, 'quote'])->name('book.quote');
+});
+Route::post('book', [BookingController::class, 'store'])->middleware('throttle:booking-write')->name('book.store');
+Route::get('book/{booking:reference_code}', [BookingController::class, 'payment'])->name('book.payment');
+Route::post('book/{booking:reference_code}/payment', [BookingController::class, 'uploadProof'])->middleware('throttle:proof-upload')->name('book.payment.store');
+Route::get('book/{booking:reference_code}/done', [BookingController::class, 'done'])->name('book.done');
+
+Route::get('track', [TrackBookingController::class, 'create'])->name('track');
+Route::post('track', [TrackBookingController::class, 'lookup'])->middleware('throttle:track')->name('track.lookup');
+Route::get('track/{booking:reference_code}', [TrackBookingController::class, 'show'])->name('track.show');
 
 /*
 | Admin panel (M2). Guests → admin.login; disabled users are signed out (active);
