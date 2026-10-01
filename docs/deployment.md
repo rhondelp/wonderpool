@@ -11,6 +11,7 @@
 ## First deployment
 ## Environment configuration
 ## Scheduler & queue workers
+- Cron (required since M4, booking expiry): `* * * * * cd /path/to/app && php artisan schedule:run >> /dev/null 2>&1`. Check with `php artisan schedule:list`.
 ## Updating / releases
 ## Backups & recovery
 
