@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\PricingAdjustmentType;
 use App\Enums\PricingRuleType;
 use Database\Factories\PricingRuleFactory;
+use App\Models\Concerns\AdminListable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -31,6 +32,8 @@ use Illuminate\Support\Carbon;
  */
 class PricingRule extends Model
 {
+    use AdminListable;
+
     /** @use HasFactory<PricingRuleFactory> */
     use HasFactory;
 
@@ -73,6 +76,16 @@ class PricingRule extends Model
     public function package(): BelongsTo
     {
         return $this->belongsTo(Package::class);
+    }
+
+    /**
+     * Columns matched by the admin search box (ILIKE).
+     *
+     * @return list<string>
+     */
+    public static function adminSearchColumns(): array
+    {
+        return ['name'];
     }
 
     /**
