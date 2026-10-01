@@ -38,6 +38,9 @@
 | D-011 | 2026-10-01 | FK delete rules: package/add-on → `restrict` (keep history), owned children (pricing_rules, booking_add_ons, payments) → `cascade`, actor columns (approved_by, verified_by, created_by, activity_logs.user_id) → `set null`. | History preserved; deleting a user never deletes bookings. | M1 |
 | D-012 | 2026-10-01 | Settings keys are dotted `group.name`; `SettingSeeder` uses firstOrCreate (never overwrites admin edits). Owner credentials come only from `.env` via `config('wonderpool.owner.*')`. | Safe re-seeding; no credentials in git. | M1 |
 | D-013 | 2026-10-01 | Guest phone stored in E.164 (`+639XXXXXXXXX`), indexed for track-booking lookup. | One canonical format for lookups/SMS later. | M1 |
+| D-015 | 2026-10-01 | Admin-only accounts at `/admin/*` (guests never log in). Forgotten passwords are reset by an owner with a temporary password (`must_change_password` forces a change); no email reset flow until mail exists (M8). Owner seeded from .env must change that password on first login. Login throttled 5 attempts/min per email+IP. | PLAN.md §10 (forced owner password change, rate-limited login); mail not configured yet. | M2 |
+| D-016 | 2026-10-01 | Roles enforced twice: route groups use `role:owner` middleware; views/requests use gates `manage-settings`, `manage-users`, `view-financials` and `UserPolicy`. Nobody can disable, reset or change the role of themselves (keeps ≥1 active owner). Admin nav lists only built modules, filtered by gate. | Staff = bookings only (PLAN.md §2.2); defense in depth. | M2 |
+| D-017 | 2026-10-01 | Settings registry = `SettingGroup::fields()` (label, input type, default, validation rules per key). `SettingService` caches all rows under `settings.all` forever, flushes on write, falls back to declared defaults; SettingSeeder seeds from the registry. Empty optional values stored as `""`. Settings forms post nested inputs `group[name]`. | One source of truth for keys, defaults and validation. | M2 |
 | D-014 | 2026-10-01 | Database engine is PostgreSQL. Switched from MySQL on 2026-10-01 because MySQL does not run on the dev machine. JSON columns are jsonb (no key-order guarantee); emails stored lowercase via User/Booking mutators; booking creation to be serialized with `pg_advisory_xact_lock` (PLAN.md §5.2). | Local MariaDB unusable; PostgreSQL available locally and in CI. | M0.1 |
 
 ## Folder Map
@@ -47,6 +50,12 @@
 | `.github/workflows/ci.yml` | CI: Pint, Larastan, npm build, Pest | M0 |
 | `app/` | Laravel app code | M0 |
 | `app/Enums/` | String-backed enums with label()/color() | M1 |
+| `app/Http/Controllers/Admin/` | Admin controllers; `Auth/` = Login, Password | M2 |
+| `app/Http/Middleware/` | EnsureUserIsActive (`active`), EnsurePasswordIsChanged (`password.changed`), EnsureUserHasRole (`role`); aliases in bootstrap/app.php | M2 |
+| `app/Http/Requests/Admin/` | Admin Form Requests (login, passwords, users, settings) | M2 |
+| `app/Policies/` | UserPolicy | M2 |
+| `app/Providers/AppServiceProvider.php` | Service singletons + gates (manage-settings, manage-users, view-financials) | M2 |
+| `app/Services/` | Business logic (see Services Index) | M2 |
 | `app/Models/` | Eloquent models (see Models & Relationships) | M1 |
 | `app/Support/Money.php` | Centavo convert/format helpers (D-001) | M1 |
 | `config/app.php` | timezone = env APP_TIMEZONE (Asia/Manila) | M0 |
@@ -57,7 +66,8 @@
 | `docs/` | architecture, database (ERD + dictionary, M1), booking-flow, admin-guide, deployment | M0 |
 | `resources/css/app.css` | Tailwind v4 entry + `@theme` tokens + Poppins imports (D-002) | M0 |
 | `resources/js/app.js` | Alpine + focus plugin bootstrap | M0 |
-| `resources/views/layouts/` | `public.blade.php` (guest site), `admin.blade.php` (sidebar/drawer) | M0 |
+| `resources/views/layouts/` | `public.blade.php` (guest site), `admin.blade.php` (sidebar/drawer, `$nav` array, account menu), `auth.blade.php` (login / change password) | M0/M2 |
+| `resources/views/admin/` | `dashboard`, `auth/{login,change-password}`, `users/{index,create,edit}`, `settings/edit` | M2 |
 | `resources/views/partials/` | `head` (meta, vite, styles stack), `admin-sidebar` (nav list) | M0 |
 | `resources/views/components/ui/` | Shared UI components (x-ui.*) | M0 |
 | `resources/views/components/admin/` | Admin-only components (x-admin.*) | M0 |
@@ -67,6 +77,8 @@
 | `tests/Feature/SmokeTest.php` | Boot/home/design-preview guard tests | M0 |
 | `tests/Feature/Models/` | FactoriesTest, BookingScopesTest (overlap edge cases), PostgresCompatibilityTest (lowercase emails, jsonb) | M1/M0.1 |
 | `tests/Feature/SeederTest.php` | Seed data, idempotency, owner env guard | M1 |
+| `tests/Feature/Admin/` | AuthTest, AccessControlTest, UsersTest, SettingsTest, DashboardTest | M2 |
+| `tests/Feature/Services/` | SettingServiceTest | M2 |
 | `tests/Unit/` | MoneyTest, EnumsTest | M1 |
 
 ## Routes Table
@@ -75,11 +87,20 @@
 | GET | `/` | home | `Route::view` → `home` | web | M0 |
 | GET | `/design-preview` | design-preview | closure → `design-preview` (local env only; REMOVE IN M9) | web | M0 |
 | GET | `/up` | — | Laravel health check | — | M0 |
+| GET/POST | `/admin/login` | admin.login / admin.login.store | Admin\Auth\LoginController@create/store | guest | M2 |
+| POST | `/admin/logout` | admin.logout | Admin\Auth\LoginController@destroy | auth, active | M2 |
+| GET/PUT | `/admin/password` | admin.password.edit / .update | Admin\Auth\PasswordController@edit/update | auth, active | M2 |
+| GET | `/admin` | admin.dashboard | Admin\DashboardController (invokable) | auth, active, password.changed | M2 |
+| GET | `/admin/settings` | admin.settings.index | redirect → /admin/settings/general | + role:owner | M2 |
+| GET/PUT | `/admin/settings/{group}` | admin.settings.edit / .update | Admin\SettingController@edit/update ({group} = SettingGroup) | + role:owner | M2 |
+| resource | `/admin/users` (except show, destroy) | admin.users.* | Admin\UserController | + role:owner | M2 |
+| PATCH | `/admin/users/{user}/active` | admin.users.toggle-active | Admin\UserController@toggleActive | + role:owner | M2 |
+| PUT | `/admin/users/{user}/password` | admin.users.reset-password | Admin\UserController@resetPassword | + role:owner | M2 |
 
 ## Database Tables
 | Table | Key columns | Relations | Milestone |
 |---|---|---|---|
-| users | email UK, role, is_active | → bookings (approved_by), payments (verified_by), blocked_dates (created_by), activity_logs | M1 (alter) |
+| users | email UK, role, is_active, must_change_password (M2), last_login_at (M2) | → bookings (approved_by), payments (verified_by), blocked_dates (created_by), activity_logs | M1 (alter) |
 | packages | code UK, base_price_cents, start_time, end_time, crosses_midnight, max_pax, is_active, sort_order | → bookings (restrict), pricing_rules (cascade) | M1 |
 | add_ons | price_cents, is_active | → booking_add_ons (restrict) | M1 |
 | pricing_rules | package_id?, type, starts_on, ends_on, days_of_week json, adjustment_type, adjustment_value, priority | package (null = global) | M1 |
@@ -98,7 +119,7 @@ Full dictionary + ERD: `docs/database.md`.
 ## Models & Relationships
 | Model | Relationships | Scopes / helpers | Milestone |
 |---|---|---|---|
-| User | approvedBookings (hasMany Booking), activityLogs | active(); isOwner(); casts role→UserRole; email mutator lowercases (D-014) | M1 |
+| User | approvedBookings (hasMany Booking), activityLogs | active(); isOwner(); casts role→UserRole, must_change_password, last_login_at; email mutator lowercases (D-014) | M1/M2 |
 | Package | bookings, pricingRules | active(), ordered(); formatted_price | M1 |
 | AddOn | bookings (belongsToMany via BookingAddOn) | active(); formatted_price | M1 |
 | BookingAddOn (Pivot) | booking, addOn | line_total_cents, formattedLineTotal() | M1 |
@@ -109,7 +130,7 @@ Full dictionary + ERD: `docs/database.md`.
 | Amenity | — | active(), ordered() | M1 |
 | GalleryImage | — | visible(), ordered() | M1 |
 | Faq | — | active(), ordered() | M1 |
-| Setting | — | — (read via SettingService, M2+) | M1 |
+| Setting | — | — (read/write only via SettingService, D-017) | M1 |
 | ActivityLog | user, subject (morphTo) | UPDATED_AT = null | M1 |
 
 ## Enums
@@ -122,18 +143,24 @@ Full dictionary + ERD: `docs/database.md`.
 | PricingRuleType | weekend, holiday, season; label() | M1 |
 | PricingAdjustmentType | percent (whole % points), fixed (signed centavos); label() | M1 |
 | GalleryCategory | pools, rooms, hall, events; label() | M1 |
+| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated; label(); add cases per module | M2 |
+| SettingGroup | general, booking, payment, contact, social; label(), icon(), fields() = settings registry (D-017) | M2 |
 
 ## Services Index
 | Class | Public methods (purpose) | Milestone |
 |---|---|---|
+| ActivityLogger | log(ActivityAction, ?Model subject, array properties, ?User actor) → ActivityLog | M2 |
+| SettingService | get(key, default), int(key, default), group(SettingGroup), update(SettingGroup, values) → changes (logged), all(), flush(), static declaredDefault(key) | M2 |
+| UserService | create, update, setActive, resetPassword (temp + force change), changeOwnPassword, recordLogin, recordLogout; all audited | M2 |
+| DashboardService | summary(?now) → pending/arrivals_today/upcoming_week/revenue_month_cents; upcoming(limit, ?now) | M2 |
 
 ## Blade Components
 | Tag | Props | Used in | Milestone |
 |---|---|---|---|
 | `x-ui.button` | variant(primary/secondary/danger/ghost), size(sm/md/lg), type, href, icon | layouts, design-preview | M0 |
-| `x-ui.input` | name*, label, type, id, value, hint, required | design-preview | M0 |
-| `x-ui.select` | name*, options[value=>label], label, id, selected, placeholder, hint, required | design-preview | M0 |
-| `x-ui.textarea` | name*, label, id, value, rows, hint, required | design-preview | M0 |
+| `x-ui.input` | name* (may be `group[key]`, D-017), label, type, id, value, hint, required | admin forms, design-preview | M0/M2 |
+| `x-ui.select` | name* (may be `group[key]`), options[value=>label], label, id, selected, placeholder, hint, required | admin users, design-preview | M0/M2 |
+| `x-ui.textarea` | name* (may be `group[key]`), label, id, value, rows, hint, required | admin settings, design-preview | M0/M2 |
 | `x-ui.card` | title, padded; slots actions, footer | design-preview | M0 |
 | `x-ui.badge` | status (BookingStatus/PaymentStatus/UserRole enum → label/color, D-004), color(pool/garden/amber/rose/slate) | design-preview | M1 |
 | `x-ui.modal` | name*, title, maxWidth(sm/md/lg/xl), show; slot footer; events open-modal/close-modal | design-preview | M0 |
@@ -144,6 +171,8 @@ Full dictionary + ERD: `docs/database.md`.
 | `x-admin.page-header` | title*, description; slot actions | design-preview | M0 |
 
 ## Settings Keys
+Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this table documents them.
+
 | Key | Group | Default | Meaning | Milestone |
 |---|---|---|---|---|
 | general.resort_name | general | Wonderpool Garden Resort | Display name | M1 |
@@ -180,7 +209,7 @@ Full dictionary + ERD: `docs/database.md`.
 | MAIL_* | Mailer; `log` in dev | M0 |
 | OWNER_NAME | Initial owner display name (OwnerSeeder) | M1 |
 | OWNER_EMAIL | Initial owner login email; seeder skips if empty | M1 |
-| OWNER_PASSWORD | Initial owner password (.env only, never committed); seeder skips if empty | M1 |
+| OWNER_PASSWORD | Initial owner password (.env only, never committed); seeder skips if empty; must be changed on first login (D-015) | M1/M2 |
 
 ## Business Flow Summaries
 ### Booking flow
@@ -196,5 +225,7 @@ Full dictionary + ERD: `docs/database.md`.
 - Resolved in M0.1: local MariaDB was unusable, so the project moved to PostgreSQL (D-014); schema verified with migrate:fresh --seed, rollback and re-migrate on PostgreSQL 18. (M0/M1/M0.1)
 - Settings contact/payment/social values are placeholders; replace once the owner answers PLAN.md §14 Q5. (M1)
 - Day package hours (7AM–5PM) and Day max pax (50) are proposed defaults pending owner confirmation (PLAN.md §1). (M1)
-- Admin/public nav links are `#` placeholders until routes exist (M2/M5). (M0)
+- Public nav links are `#` placeholders until routes exist (M5). Admin nav lists built modules only; add Bookings/Content/Reports entries to `$nav` in layouts/admin.blade.php as they ship. (M0/M2)
+- No self-service "forgot password" email yet; owner resets passwords (D-015). Revisit in M8. (M2)
+- Dashboard charts/occupancy deferred to M7. (M2)
 - Remove `/design-preview` route + view in M9 (D-007). (M0)

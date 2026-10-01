@@ -3,9 +3,9 @@
 | ID | Phase | Title | Status | Date done | Commit hash |
 |---|---|---|---|---|---|
 | M0 | 0 | Setup | Done | 2026-10-01 | 7c42f4f |
-| M0.1 | 0 | Switch database to PostgreSQL (change) | In review | 2026-10-01 | 6209193 |
+| M0.1 | 0 | Switch database to PostgreSQL (change) | Done | 2026-10-01 | 6209193 |
 | M1 | 1 | Data layer | Done | 2026-10-01 | e1e0b27 |
-| M2 | 2 | Admin foundation | Not started | | |
+| M2 | 2 | Admin foundation | In review | 2026-10-01 | PENDING |
 | M3 | 3 | Content modules | Not started | | |
 | M4 | 4 | Booking engine | Not started | | |
 | M5 | 5 | Public site | Not started | | |
@@ -30,6 +30,41 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 -->
 
 # Reports
+
+## M2 Admin foundation (Done 2026-10-01, commit PENDING)
+**Goal:** Secure admin panel entry (auth, roles), dashboard shell, and owner-editable settings via a cached SettingService.
+**Delivered:**
+- `/admin/login` sign-in/out: 5 failed attempts/min lockout per email+IP, disabled accounts rejected, session regeneration, `last_login_at`, login/logout audited
+- Forced password change (`must_change_password`): seeded owner on first login and any owner-reset temporary password; voluntary change from the account menu
+- Middleware `active` (signs out disabled users mid-session), `password.changed`, `role:owner`; gates manage-settings / manage-users / view-financials; UserPolicy
+- Owner-only Users: list, add (temporary password), edit, enable/disable, reset password; no self-disable/demote/reset
+- Owner-only Settings: 5 tabs from `SettingGroup` registry, validation from the registry, changes audited with from/to values
+- Dashboard shell: pending, arrivals today, next 7 days, revenue this month (owner only), next 5 upcoming bookings
+- ActivityLogger + ActivityAction enum (activity log viewer comes in M7)
+- Role-aware admin nav (only built modules) and account menu
+**Files created / modified:**
+- Enums/services: app/Enums/{ActivityAction,SettingGroup}.php, app/Services/{ActivityLogger,SettingService,UserService,DashboardService}.php, app/Providers/AppServiceProvider.php
+- HTTP: app/Http/Controllers/Admin/{DashboardController,SettingController,UserController}.php, app/Http/Controllers/Admin/Auth/{LoginController,PasswordController}.php, app/Http/Middleware/*.php, app/Http/Requests/Admin/*.php, app/Policies/UserPolicy.php, bootstrap/app.php, routes/web.php
+- Data: database/migrations/2026_10_01_001400_add_security_columns_to_users_table.php, app/Models/User.php, database/factories/UserFactory.php, database/seeders/{OwnerSeeder,SettingSeeder}.php
+- Views: resources/views/layouts/{admin,auth}.blade.php, resources/views/partials/admin-sidebar.blade.php, resources/views/admin/**, resources/views/components/ui/{input,select,textarea}.blade.php
+- Tests: tests/Feature/Admin/{AuthTest,AccessControlTest,UsersTest,SettingsTest,DashboardTest}.php, tests/Feature/Services/SettingServiceTest.php
+- Docs: CHANGELOG.md, HISTORY.md, MILESTONES.md, docs/admin-guide.md
+**DB changes:** users.must_change_password (bool, default false), users.last_login_at (timestamp, nullable).
+**Routes:** admin.login(.store), admin.logout, admin.password.edit/update, admin.dashboard, admin.settings.index/edit/update, admin.users.index/create/store/edit/update, admin.users.toggle-active, admin.users.reset-password (table in HISTORY.md).
+**How to verify:** `php artisan migrate` (or `migrate:fresh --seed`) → `php artisan serve` → `/admin` redirects to `/admin/login` → sign in with OWNER_EMAIL/OWNER_PASSWORD → forced to `/admin/password` → set new password → dashboard → Settings (edit Booking rules) → Users (add staff, disable/enable, reset password) → sign in as staff: no Users/Settings links, `/admin/settings/general` = 403. Automated: `vendor/bin/pest` (116 tests; tests/Feature/Admin/*, SettingServiceTest), `vendor/bin/pint --test`, `vendor/bin/phpstan analyse` (level 6, no errors).
+**Key decisions:** D-015 (admin auth + temporary passwords), D-016 (role enforcement), D-017 (settings registry + cache).
+**Edit entry points (where to change things later):**
+- To add/change a setting: `app/Enums/SettingGroup.php` (`fields()`), then HISTORY.md Settings Keys; read it with `SettingService::get/int`.
+- To add an admin nav item: `$nav` in `resources/views/layouts/admin.blade.php` (route, active pattern, gate).
+- To change who may do what: gates in `app/Providers/AppServiceProvider.php`, `app/Policies/UserPolicy.php`, route groups in `routes/web.php`.
+- To change login throttling: `app/Http/Requests/Admin/LoginRequest.php` (`MAX_ATTEMPTS`, `throttleKey()`).
+- To change password strength: `Password::min(8)->letters()->numbers()` in UpdateOwnPasswordRequest, StoreUserRequest, ResetUserPasswordRequest.
+- To log a new action: add a case to `app/Enums/ActivityAction.php` and call `ActivityLogger::log()`.
+- To change dashboard figures: `app/Services/DashboardService.php`.
+**Known limitations / follow-ups:**
+- No email "forgot password" flow (owner resets instead); revisit with mail in M8.
+- Activity log viewer, dashboard charts/occupancy: M7. Bookings/content nav entries added in M3/M6.
+- Settings for logo, cancellation policy and notification toggles are added in the phases that use them.
 
 ## M0.1 Switch database to PostgreSQL (Done 2026-10-01, commit 6209193)
 **Goal:** Replace MySQL with PostgreSQL (MySQL does not run on the dev machine). Infrastructure only: no business rules, features or UI change.

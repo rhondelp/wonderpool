@@ -15,6 +15,28 @@ ENTRY TEMPLATE
 
 ## Unreleased
 
+## [M2] Admin foundation - 2026-10-01
+### Added
+- Admin sign-in/out at /admin/login: 5 failed attempts per email+IP lockout, disabled accounts rejected, session regeneration, last_login_at, login/logout audit (files: app/Http/Controllers/Admin/Auth/LoginController.php, app/Http/Requests/Admin/LoginRequest.php, resources/views/layouts/auth.blade.php, resources/views/admin/auth/login.blade.php)
+- Forced/voluntary own password change; owner seeder flags the owner to change the .env password on first login (files: app/Http/Controllers/Admin/Auth/PasswordController.php, app/Http/Requests/Admin/UpdateOwnPasswordRequest.php, resources/views/admin/auth/change-password.blade.php, database/seeders/OwnerSeeder.php)
+- Middleware `active` (signs out disabled users), `password.changed`, `role:<roles>`; guests redirect to admin.login, users to admin.dashboard (files: app/Http/Middleware/EnsureUserIsActive.php, app/Http/Middleware/EnsurePasswordIsChanged.php, app/Http/Middleware/EnsureUserHasRole.php, bootstrap/app.php)
+- Gates manage-settings, manage-users, view-financials; UserPolicy (no self-disable/self-reset) (files: app/Providers/AppServiceProvider.php, app/Policies/UserPolicy.php)
+- Owner-only users management: list, add with temporary password, edit (no own role change), enable/disable, reset password (files: app/Http/Controllers/Admin/UserController.php, app/Http/Requests/Admin/StoreUserRequest.php, app/Http/Requests/Admin/UpdateUserRequest.php, app/Http/Requests/Admin/ResetUserPasswordRequest.php, app/Services/UserService.php, resources/views/admin/users/*.blade.php)
+- Owner-only settings screen, one tab per group; registry of keys/defaults/rules in SettingGroup; cached SettingService (files: app/Enums/SettingGroup.php, app/Services/SettingService.php, app/Http/Controllers/Admin/SettingController.php, app/Http/Requests/Admin/UpdateSettingsRequest.php, resources/views/admin/settings/edit.blade.php)
+- ActivityLogger + ActivityAction enum (auth, user, settings actions) (files: app/Services/ActivityLogger.php, app/Enums/ActivityAction.php)
+- Dashboard shell: pending, arrivals today, next 7 days, revenue this month (owner), upcoming list (files: app/Services/DashboardService.php, app/Http/Controllers/Admin/DashboardController.php, resources/views/admin/dashboard.blade.php)
+- Tests: auth, access control, users, settings, dashboard, SettingService (files: tests/Feature/Admin/*.php, tests/Feature/Services/SettingServiceTest.php)
+### Changed
+- Admin layout: role-aware nav built from routes (only built modules listed), account menu with change password / sign out (files: resources/views/layouts/admin.blade.php, resources/views/partials/admin-sidebar.blade.php)
+- x-ui.input/select/textarea accept bracketed names (`group[key]`) for old() and error lookup (files: resources/views/components/ui/input.blade.php, resources/views/components/ui/select.blade.php, resources/views/components/ui/textarea.blade.php)
+- SettingSeeder seeds from SettingGroup::fields() and flushes the settings cache (files: database/seeders/SettingSeeder.php)
+- User: must_change_password, last_login_at; factory state mustChangePassword() (files: app/Models/User.php, database/factories/UserFactory.php)
+- Admin guide: signing in, users, dashboard, settings (files: docs/admin-guide.md)
+### DB: added 2026_10_01_001400_add_security_columns_to_users_table (users.must_change_password, users.last_login_at)
+### Routes: added admin.login, admin.login.store, admin.logout, admin.password.edit/update, admin.dashboard, admin.settings.index/edit/update, admin.users.index/create/store/edit/update, admin.users.toggle-active, admin.users.reset-password
+### Breaking / Notes
+- Run `php artisan migrate`. Re-running OwnerSeeder resets the owner password to OWNER_PASSWORD and forces a change on next login.
+
 ## [M0.1] Switch database engine to PostgreSQL - 2026-10-01
 ### Changed
 - Default DB connection is `pgsql`; `.env.example` uses PostgreSQL placeholders (127.0.0.1:5432, db wonderpool, user wonderpool_user) (files: config/database.php, .env.example)
