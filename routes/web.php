@@ -5,10 +5,13 @@ use App\Http\Controllers\Admin\AmenityController;
 use App\Http\Controllers\Admin\Auth\LoginController;
 use App\Http\Controllers\Admin\Auth\PasswordController;
 use App\Http\Controllers\Admin\BlockedDateController;
+use App\Http\Controllers\Admin\BookingActionController;
+use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\FaqController;
 use App\Http\Controllers\Admin\GalleryController;
 use App\Http\Controllers\Admin\PackageController;
+use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PricingRuleController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
@@ -69,6 +72,27 @@ Route::prefix('admin')->name('admin.')->group(function () {
 
         Route::middleware('password.changed')->group(function () {
             Route::get('/', DashboardController::class)->name('dashboard');
+
+            // Bookings & payments (M6): owners AND staff; finer rules in BookingPolicy/PaymentPolicy (D-029).
+            Route::prefix('bookings')->name('bookings.')->group(function () {
+                Route::get('/', [AdminBookingController::class, 'index'])->name('index');
+                Route::get('create', [AdminBookingController::class, 'create'])->name('create');
+                Route::post('/', [AdminBookingController::class, 'store'])->name('store');
+                Route::get('calendar', [AdminBookingController::class, 'calendar'])->name('calendar');
+                Route::post('quote', [AdminBookingController::class, 'quote'])->name('quote');
+                Route::get('{booking}', [AdminBookingController::class, 'show'])->name('show');
+                Route::get('{booking}/receipt', [AdminBookingController::class, 'receipt'])->name('receipt');
+                Route::post('{booking}/approve', [BookingActionController::class, 'approve'])->name('approve');
+                Route::post('{booking}/reject', [BookingActionController::class, 'reject'])->name('reject');
+                Route::post('{booking}/cancel', [BookingActionController::class, 'cancel'])->name('cancel');
+                Route::post('{booking}/complete', [BookingActionController::class, 'complete'])->name('complete');
+                Route::post('{booking}/reschedule', [BookingActionController::class, 'reschedule'])->name('reschedule');
+                Route::patch('{booking}/notes', [BookingActionController::class, 'notes'])->name('notes');
+                Route::post('{booking}/payments', [PaymentController::class, 'store'])->name('payments.store');
+            });
+            Route::patch('payments/{payment}/verify', [PaymentController::class, 'verify'])->name('payments.verify');
+            Route::patch('payments/{payment}/reject', [PaymentController::class, 'reject'])->name('payments.reject');
+            Route::get('payments/{payment}/proof', [PaymentController::class, 'proof'])->name('payments.proof');
 
             Route::middleware('role:owner')->group(function () {
                 Route::redirect('settings', '/admin/settings/'.SettingGroup::General->value)->name('settings.index');

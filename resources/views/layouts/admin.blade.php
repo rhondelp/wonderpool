@@ -9,6 +9,7 @@
 @php
     $nav = [
         ['label' => 'Dashboard', 'icon' => 'home', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'can' => null],
+        ['label' => 'Bookings', 'icon' => 'calendar-days', 'route' => 'admin.bookings.index', 'active' => 'admin.bookings.*', 'can' => 'manage-bookings'],
         ['label' => 'Packages', 'icon' => 'cube', 'route' => 'admin.packages.index', 'active' => 'admin.packages.*', 'can' => 'manage-content'],
         ['label' => 'Pricing rules', 'icon' => 'receipt-percent', 'route' => 'admin.pricing-rules.index', 'active' => 'admin.pricing-rules.*', 'can' => 'manage-content'],
         ['label' => 'Blocked dates', 'icon' => 'no-symbol', 'route' => 'admin.blocked-dates.index', 'active' => 'admin.blocked-dates.*', 'can' => 'manage-content'],
