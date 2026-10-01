@@ -4,8 +4,11 @@
 
 ## Conventions (naming, money, timestamps, soft deletes)
 
+- **Engine:** PostgreSQL 15+ (D-014). Tests run on the separate database `wonderpool_test`.
+- **JSON:** `jsonb` columns (`pricing_rules.days_of_week`, `activity_logs.properties`); key order is not preserved.
+- **Emails:** stored trimmed and lowercase (User `email`, Booking `guest_email` mutators) because PostgreSQL comparisons are case-sensitive; search text with `ILIKE`.
 - **Money:** integer centavos in `*_cents` columns (`700000` = ₱7,000.00). Format only for display via `App\Support\Money::format()` (D-001).
-- **Enums:** stored as short strings, cast to PHP enums in `app/Enums` (see HISTORY.md "Enums").
+- **Enums:** stored as `string(20)` columns (no native enum types), cast to PHP enums in `app/Enums` (see HISTORY.md "Enums").
 - **Time windows:** `starts_at`/`ends_at` are half-open `[start, end)`. Two windows overlap when `a.starts_at < b.ends_at AND a.ends_at > b.starts_at`; touching boundaries do **not** overlap.
 - **Timezone:** datetimes are stored as local Asia/Manila wall-clock time (app timezone; D-009).
 - **Snapshots:** bookings copy `total_amount_cents`, and `booking_add_ons` copy `unit_price_cents`, so later price edits never change old bookings.
@@ -103,7 +106,7 @@ Standalone content tables (no foreign keys): `amenities`, `gallery_images`, `faq
 | Column | Type | Notes |
 |---|---|---|
 | id | bigint PK | |
-| name, email (unique), password | string | Laravel default |
+| name, email (unique, lowercase), password | string | Laravel default |
 | role | string(20) | `UserRole`: owner, staff (default staff) |
 | is_active | bool | Disabled users cannot sign in (M2) |
 | email_verified_at, remember_token, timestamps | | Laravel default |
@@ -139,7 +142,7 @@ Indexes: `code` unique, `(is_active, sort_order)`.
 | name | string | |
 | type | string(20) | `PricingRuleType`: weekend, holiday, season |
 | starts_on, ends_on | date null | Date range (season/holiday) |
-| days_of_week | json null | ISO weekdays, 1 = Mon … 7 = Sun |
+| days_of_week | jsonb null | ISO weekdays, 1 = Mon … 7 = Sun |
 | adjustment_type | string(20) | `PricingAdjustmentType`: percent, fixed |
 | adjustment_value | int (signed) | percent points, or centavos for fixed |
 | priority | usmallint | Applied in ascending order (M4) |
@@ -238,7 +241,7 @@ The key list is in HISTORY.md under "Settings Keys".
 | user_id | FK null → users (set null) | NULL = system/guest |
 | action | string(100) | e.g. `booking.approved` |
 | subject_type, subject_id | morph, nullable | Target record |
-| properties | json null | Before/after details |
+| properties | jsonb null | Before/after details |
 | created_at | timestamp | No updated_at (append-only) |
 
 Indexes: `action`, `created_at`, `(subject_type, subject_id)`.

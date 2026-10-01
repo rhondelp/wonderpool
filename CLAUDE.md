@@ -1,7 +1,7 @@
 # Wonderpool Garden Resort — Agent Rules
 
 Online booking system for Wonderpool Garden Resort: public site (rooms, cottages, amenities, availability, booking requests with payment proof) plus an admin panel (content, bookings, reports, logs, notifications). Full scope: PLAN.md.
-**Stack:** Laravel + Blade, MySQL, Tailwind CSS, blade-heroicons, Poppins font, Alpine.js. Blue-green "pool/garden" theme.
+**Stack:** Laravel + Blade, PostgreSQL, Tailwind CSS, blade-heroicons, Poppins font, Alpine.js. Blue-green "pool/garden" theme.
 
 ## Token-saving rules
 a. At the start of every task, read HISTORY.md and the top 3 entries of CHANGELOG.md. They are the source of truth for project structure.
@@ -22,6 +22,9 @@ d. Do not re-read files you just wrote.
 - Tailwind tokens `pool-*` and `garden-*`; Poppins font.
 - Reusable Blade components: `x-ui.*` (public/shared), `x-admin.*` (admin).
 - Mobile-first, WCAG AA contrast, no inline styles.
+
+## Database rules (PostgreSQL)
+- Use Eloquent or the query builder; if raw SQL is unavoidable use PostgreSQL syntax only (ILIKE, DATE_TRUNC, TO_CHAR, COALESCE; never DATE_FORMAT, IFNULL or backticks); LIKE is case-sensitive so search with ILIKE; JSON columns are jsonb; enum-backed columns are string columns validated by PHP enums; store emails lowercase; quote reserved words such as "group" in raw SQL; never combine lockForUpdate with count() or other aggregates; tests run on PostgreSQL (wonderpool_test), never SQLite.
 
 ## Repository
 https://github.com/rhondelp/wonderpool.git (PUBLIC). Default branch: `main`.
