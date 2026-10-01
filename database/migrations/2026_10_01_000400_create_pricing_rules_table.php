@@ -18,7 +18,7 @@ return new class () extends Migration {
             $table->string('type', 20);
             $table->date('starts_on')->nullable();
             $table->date('ends_on')->nullable();
-            $table->json('days_of_week')->nullable();
+            $table->jsonb('days_of_week')->nullable();
             $table->string('adjustment_type', 20);
             $table->integer('adjustment_value');
             $table->unsignedSmallInteger('priority')->default(0);

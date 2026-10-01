@@ -33,5 +33,7 @@ Homestead.yaml
 
 # Dumps & logs
 *.sql
+*.dump
+*.backup
 *.sqlite
 *.log

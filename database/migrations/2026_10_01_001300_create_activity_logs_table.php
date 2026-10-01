@@ -15,7 +15,7 @@ return new class () extends Migration {
             $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
             $table->string('action', 100);
             $table->nullableMorphs('subject');
-            $table->json('properties')->nullable();
+            $table->jsonb('properties')->nullable();
             $table->timestamp('created_at')->useCurrent();
 
             $table->index('action');

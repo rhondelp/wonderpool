@@ -97,6 +97,16 @@ class Booking extends Model
     }
 
     /**
+     * Stores the guest email trimmed and lowercase (PostgreSQL comparisons are case-sensitive).
+     *
+     * @return Attribute<string|null, string|null>
+     */
+    protected function guestEmail(): Attribute
+    {
+        return Attribute::set(fn (?string $value): ?string => $value === null ? null : mb_strtolower(trim($value)));
+    }
+
+    /**
      * @return BelongsTo<Package, $this>
      */
     public function package(): BelongsTo
