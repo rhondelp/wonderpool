@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Support\Money;
 use Database\Factories\PackageFactory;
+use App\Models\Concerns\AdminListable;
+use App\Models\Contracts\GuardsDeletion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -30,8 +32,10 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read string $formatted_price
  */
-class Package extends Model
+class Package extends Model implements GuardsDeletion
 {
+    use AdminListable;
+
     /** @use HasFactory<PackageFactory> */
     use HasFactory;
 
@@ -91,6 +95,27 @@ class Package extends Model
     protected function formattedPrice(): Attribute
     {
         return Attribute::get(fn (): string => Money::format($this->base_price_cents));
+    }
+
+
+    /**
+     * Columns matched by the admin search box (ILIKE).
+     *
+     * @return list<string>
+     */
+    public static function adminSearchColumns(): array
+    {
+        return ['name', 'code', 'description'];
+    }
+
+    /**
+     * Packages referenced by any booking (even soft-deleted ones) cannot be deleted; deactivate them instead.
+     */
+    public function deletionBlockedReason(): ?string
+    {
+        $count = $this->bookings()->withTrashed()->count();
+
+        return $count === 0 ? null : "{$this->name} has {$count} booking(s) and cannot be deleted. Deactivate it instead to hide it from guests.";
     }
 
     /**

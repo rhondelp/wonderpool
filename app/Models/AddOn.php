@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Support\Money;
 use Database\Factories\AddOnFactory;
+use App\Models\Concerns\AdminListable;
+use App\Models\Contracts\GuardsDeletion;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -23,8 +25,10 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read string $formatted_price
  */
-class AddOn extends Model
+class AddOn extends Model implements GuardsDeletion
 {
+    use AdminListable;
+
     /** @use HasFactory<AddOnFactory> */
     use HasFactory;
 
@@ -70,6 +74,27 @@ class AddOn extends Model
     protected function formattedPrice(): Attribute
     {
         return Attribute::get(fn (): string => Money::format($this->price_cents));
+    }
+
+
+    /**
+     * Columns matched by the admin search box (ILIKE).
+     *
+     * @return list<string>
+     */
+    public static function adminSearchColumns(): array
+    {
+        return ['name', 'description'];
+    }
+
+    /**
+     * Add-ons used on any booking cannot be deleted (booking_add_ons restricts); deactivate them instead.
+     */
+    public function deletionBlockedReason(): ?string
+    {
+        $count = BookingAddOn::query()->where('add_on_id', $this->getKey())->count();
+
+        return $count === 0 ? null : "{$this->name} is used on {$count} booking(s) and cannot be deleted. Deactivate it instead.";
     }
 
     /**
