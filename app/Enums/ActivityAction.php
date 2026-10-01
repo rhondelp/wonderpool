@@ -25,6 +25,7 @@ enum ActivityAction: string
     case BookingStatusChanged = 'booking.status_changed';
     case BookingRescheduled = 'booking.rescheduled';
     case BookingExpired = 'booking.expired';
+    case PaymentProofUploaded = 'payment.proof_uploaded';
 
     /**
      * Human-readable label for the activity log screen.
@@ -49,6 +50,7 @@ enum ActivityAction: string
             self::BookingStatusChanged => 'Changed booking status',
             self::BookingRescheduled => 'Rescheduled booking',
             self::BookingExpired => 'Expired unpaid booking',
+            self::PaymentProofUploaded => 'Uploaded payment proof',
         };
     }
 }
