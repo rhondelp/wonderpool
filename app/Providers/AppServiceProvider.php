@@ -39,6 +39,8 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-users', fn (User $user): bool => $user->isOwner());
         Gate::define('manage-content', fn (User $user): bool => $user->isOwner());
         Gate::define('view-financials', fn (User $user): bool => $user->isOwner());
+        // Bookings: owners and staff (D-029); finer rules in BookingPolicy / PaymentPolicy.
+        Gate::define('manage-bookings', fn (User $user): bool => $user->is_active);
 
         // Public booking endpoints (D-028), keyed by client IP.
         RateLimiter::for('booking-read', fn (Request $request) => Limit::perMinute(60)->by($request->ip()));

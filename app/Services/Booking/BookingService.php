@@ -3,12 +3,14 @@
 namespace App\Services\Booking;
 
 use App\Enums\ActivityAction;
+use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
 use App\Events\BookingStatusChanged;
 use App\Exceptions\Booking\GuestCountExceededException;
 use App\Exceptions\Booking\InvalidAddOnException;
 use App\Exceptions\Booking\InvalidStatusTransitionException;
 use App\Exceptions\Booking\PackageUnavailableException;
+use App\Exceptions\Booking\PriceOverrideNotAllowedException;
 use App\Exceptions\Booking\ReferenceCodeExhaustedException;
 use App\Exceptions\Booking\SlotUnavailableException;
 use App\Models\Booking;
@@ -73,9 +75,11 @@ class BookingService
     /**
      * Creates a pending booking with a price snapshot (booking totals + add-on unit prices).
      * Booking window rules (lead time, max advance) are checked by the caller (M5 request);
-     * admins may create walk-ins inside the lead time.
+     * admins may create walk-ins inside the lead time. An owner may override the quoted total
+     * (price_override_cents + mandatory price_override_reason, D-031); the quote is kept in
+     * original_total_cents and the downpayment is recomputed from the override.
      *
-     * @param  array{package_id: int|string, date: string|CarbonInterface, guest_name: string, guest_phone: string, guest_email?: string|null, event_type?: string|null, guest_count: int|string, notes?: string|null, add_ons?: array<int|string, int|string>, admin_notes?: string|null}  $data  Validated input; date = start date (Y-m-d)
+     * @param  array{package_id: int|string, date: string|CarbonInterface, guest_name: string, guest_phone: string, guest_email?: string|null, event_type?: string|null, guest_count: int|string, notes?: string|null, add_ons?: array<int|string, int|string>, admin_notes?: string|null, source?: BookingSource, created_by?: int|null, price_override_cents?: int|null, price_override_reason?: string|null}  $data  Validated input; date = start date (Y-m-d)
      * @param  User|null  $actor  Admin creating it (null = guest)
      *
      * @throws PackageUnavailableException When the package is missing or inactive
@@ -83,6 +87,7 @@ class BookingService
      * @throws GuestCountExceededException When the guest count does not fit the package
      * @throws InvalidAddOnException When an add-on is unknown/inactive or its quantity is invalid
      * @throws ReferenceCodeExhaustedException When no free reference code is found
+     * @throws PriceOverrideNotAllowedException When a non-owner overrides the price, the reason is missing or the price is negative
      */
     public function create(array $data, ?User $actor = null): Booking
     {
@@ -99,6 +104,7 @@ class BookingService
             $this->ensureAvailable($window['starts_at'], $window['ends_at']);
 
             $quote = $this->pricing->quote($package, $date, $data['add_ons'] ?? [], (int) $data['guest_count']);
+            [$total, $downpayment, $override] = $this->applyOverride($quote, $data, $actor);
 
             $booking = Booking::query()->create([
                 'reference_code' => $this->references->generate($window['starts_at']),
@@ -112,9 +118,13 @@ class BookingService
                 'admin_notes' => $data['admin_notes'] ?? null,
                 'starts_at' => $window['starts_at'],
                 'ends_at' => $window['ends_at'],
-                'total_amount_cents' => $quote->totalCents,
-                'downpayment_required_cents' => $quote->downpaymentRequiredCents,
+                'total_amount_cents' => $total,
+                'downpayment_required_cents' => $downpayment,
                 'status' => BookingStatus::Pending,
+                'source' => $data['source'] ?? BookingSource::Guest,
+                'created_by' => $data['created_by'] ?? null,
+                'original_total_cents' => $override === null ? null : $quote->totalCents,
+                'price_override_reason' => $override,
             ]);
 
             $this->snapshotAddOns($booking, $quote);
@@ -123,8 +133,17 @@ class BookingService
                 'reference' => $booking->reference_code,
                 'package' => $package->code,
                 'starts_at' => $booking->starts_at->toDateTimeString(),
-                'total_cents' => $quote->totalCents,
+                'total_cents' => $total,
+                'source' => $booking->source->value,
             ], $actor);
+
+            if ($override !== null) {
+                $this->logger->log(ActivityAction::BookingPriceOverridden, $booking, [
+                    'from' => $quote->totalCents,
+                    'to' => $total,
+                    'reason' => $override,
+                ], $actor);
+            }
 
             return $booking;
         }));
@@ -287,6 +306,10 @@ class BookingService
                 $booking->rejection_reason = $reason;
             }
 
+            if ($to === BookingStatus::Cancelled && $reason !== null) {
+                $booking->cancellation_reason = $reason;
+            }
+
             if ($to === BookingStatus::Approved) {
                 $booking->approved_by = $actor?->id;
                 $booking->approved_at = now();
@@ -305,6 +328,38 @@ class BookingService
         BookingStatusChanged::dispatch($booking, $from, $to, $actor, $reason);
 
         return $booking;
+    }
+
+    /**
+     * Total, downpayment and override reason after an optional owner price override (D-031).
+     *
+     * @param  array<string, mixed>  $data  create() input
+     * @return array{0: int, 1: int, 2: string|null} [total cents, downpayment cents, override reason or null]
+     *
+     * @throws PriceOverrideNotAllowedException
+     */
+    private function applyOverride(PriceBreakdown $quote, array $data, ?User $actor): array
+    {
+        if (! isset($data['price_override_cents'])) {
+            return [$quote->totalCents, $quote->downpaymentRequiredCents, null];
+        }
+
+        $override = (int) $data['price_override_cents'];
+        $reason = trim((string) ($data['price_override_reason'] ?? ''));
+
+        if ($actor === null || ! $actor->isOwner()) {
+            throw new PriceOverrideNotAllowedException('Only the owner can override a booking price.');
+        }
+
+        if ($reason === '') {
+            throw new PriceOverrideNotAllowedException('A reason is required to override the price.');
+        }
+
+        if ($override < 0) {
+            throw new PriceOverrideNotAllowedException('The overridden price cannot be negative.');
+        }
+
+        return [$override, intdiv($override * $quote->downpaymentPercent + 50, 100), $reason];
     }
 
     /**

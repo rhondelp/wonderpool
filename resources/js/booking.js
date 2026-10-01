@@ -6,9 +6,13 @@
  * availability logic lives here. The final submit is a normal form POST to /book, which re-validates
  * everything server-side; without JavaScript the same form works with all steps visible.
  *
+ * Also used by the admin walk-in and reschedule forms (M6) with admin URLs and `extra`
+ * (e.g. { booking: 12 } to ignore the booking being moved).
+ *
  * @param {{
  *   urls: { availability: string, quote: string },
  *   packageId: string, date: string, guestCount: number, addOns: Record<string, number>, step: number,
+ *   extra?: Record<string, string|number>,
  * }} config
  */
 export default function bookingForm(config) {
@@ -56,7 +60,7 @@ export default function bookingForm(config) {
             if (!this.packageId) return;
             this.calendarLoading = true;
             this.calendarError = '';
-            const params = new URLSearchParams({ package_id: this.packageId });
+            const params = new URLSearchParams({ package_id: this.packageId, ...(config.extra ?? {}) });
             if (month) params.set('month', month);
 
             try {
@@ -102,7 +106,7 @@ export default function bookingForm(config) {
                         Accept: 'application/json',
                         'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content ?? '',
                     },
-                    body: JSON.stringify({ package_id: this.packageId, date: this.date, guest_count: this.guestCount, add_ons: this.addOns }),
+                    body: JSON.stringify({ ...(config.extra ?? {}), package_id: this.packageId, date: this.date, guest_count: this.guestCount, add_ons: this.addOns }),
                 });
                 const data = await response.json();
 

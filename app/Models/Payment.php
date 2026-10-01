@@ -25,6 +25,9 @@ use Illuminate\Support\Carbon;
  * @property string|null $reference_no GCash/bank transaction reference
  * @property int|null $verified_by
  * @property Carbon|null $verified_at
+ * @property string|null $notes Admin note when recording/handling the payment
+ * @property int|null $recorded_by Admin who recorded a manual payment
+ * @property string|null $rejection_reason
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read string $formatted_amount
@@ -46,6 +49,9 @@ class Payment extends Model
         'reference_no',
         'verified_by',
         'verified_at',
+        'notes',
+        'recorded_by',
+        'rejection_reason',
     ];
 
     /**
@@ -74,6 +80,32 @@ class Payment extends Model
     public function booking(): BelongsTo
     {
         return $this->belongsTo(Booking::class);
+    }
+
+    /**
+     * Admin who recorded a manual payment.
+     *
+     * @return BelongsTo<User, $this>
+     */
+    public function recorder(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    /**
+     * Whether a proof file was uploaded for this payment.
+     */
+    public function hasProof(): bool
+    {
+        return $this->proof_path !== null && $this->proof_path !== '';
+    }
+
+    /**
+     * Whether the proof is a PDF (else an image).
+     */
+    public function proofIsPdf(): bool
+    {
+        return str_ends_with((string) $this->proof_path, '.pdf');
     }
 
     /**

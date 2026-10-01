@@ -305,7 +305,7 @@ theme: {
 3. Is the ₱7,000 day rate also capped at 50 pax? Are extra guests or extra hours charged?
 4. Refund/cancellation and reschedule policy to display?
 5. Payment channels to list (GCash number, bank account name)?
-6. Should Staff be able to approve bookings, or only the Owner?
+6. Should Staff be able to approve bookings, or only the Owner? **Answered (M6): Staff can run the whole booking lifecycle; price overrides and voiding verified payments are owner-only (HISTORY D-029).**
 7. Preferred logo/brand colors, or should we derive them from the Facebook page?
 8. Notification preference: email only, or SMS too?
 

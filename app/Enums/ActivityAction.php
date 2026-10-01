@@ -26,6 +26,11 @@ enum ActivityAction: string
     case BookingRescheduled = 'booking.rescheduled';
     case BookingExpired = 'booking.expired';
     case PaymentProofUploaded = 'payment.proof_uploaded';
+    case BookingPriceOverridden = 'booking.price_overridden';
+    case BookingNotesUpdated = 'booking.notes_updated';
+    case PaymentRecorded = 'payment.recorded';
+    case PaymentVerified = 'payment.verified';
+    case PaymentRejected = 'payment.rejected';
 
     /**
      * Human-readable label for the activity log screen.
@@ -51,6 +56,11 @@ enum ActivityAction: string
             self::BookingRescheduled => 'Rescheduled booking',
             self::BookingExpired => 'Expired unpaid booking',
             self::PaymentProofUploaded => 'Uploaded payment proof',
+            self::BookingPriceOverridden => 'Overrode booking price',
+            self::BookingNotesUpdated => 'Updated internal notes',
+            self::PaymentRecorded => 'Recorded payment',
+            self::PaymentVerified => 'Verified payment',
+            self::PaymentRejected => 'Rejected payment',
         };
     }
 }

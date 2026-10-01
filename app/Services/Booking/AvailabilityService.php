@@ -78,9 +78,10 @@ class AvailabilityService
      * @param  CarbonInterface  $from  First date
      * @param  CarbonInterface  $to  Last date (inclusive)
      * @param  Package|null  $package  Restrict to one package
+     * @param  int|null  $ignoreBookingId  Booking to leave out (admin rescheduling, M6)
      * @return array<string, array{available: bool, packages: array<int, bool>}> Keyed by Y-m-d
      */
-    public function unavailableDates(CarbonInterface $from, CarbonInterface $to, ?Package $package = null): array
+    public function unavailableDates(CarbonInterface $from, CarbonInterface $to, ?Package $package = null, ?int $ignoreBookingId = null): array
     {
         $first = CarbonImmutable::parse($from->format('Y-m-d'), config('app.timezone'));
         $last = CarbonImmutable::parse($to->format('Y-m-d'), config('app.timezone'));
@@ -88,7 +89,7 @@ class AvailabilityService
 
         // Windows can start on $last and end the next morning, so look one extra day ahead.
         $rangeEnd = $last->addDays(2);
-        $busy = $this->bookingsQuery($first, $rangeEnd)->get(['starts_at', 'ends_at'])
+        $busy = $this->bookingsQuery($first, $rangeEnd, $ignoreBookingId)->get(['starts_at', 'ends_at'])
             ->concat(BlockedDate::query()->overlapping($first, $rangeEnd)->get(['starts_at', 'ends_at']))
             ->map(fn ($row): array => [$row->starts_at->getTimestamp(), $row->ends_at->getTimestamp()])
             ->all();

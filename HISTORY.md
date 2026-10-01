@@ -19,6 +19,7 @@
 | Pest | 3.x + pest-plugin-laravel | M0 |
 | Larastan | 3.x, level 6 | M0 |
 | intervention/image | 3.11 (GD driver; PHP `gd` with WebP required, CI enables it) | M3 |
+| barryvdh/laravel-dompdf | 3.1 (receipt PDFs, M6) | M6 |
 | Pint | 1.x, preset psr12 | M0 |
 | Vite | 7.x (laravel-vite-plugin 2) | M0 |
 
@@ -53,6 +54,11 @@
 | D-026 | 2026-10-01 | Payment proofs: jpg/png/webp/pdf ≤ 5 MB (extension + real MIME). Stored ONLY on the private `local` disk at `storage/app/private/payment-proofs/{booking_id}/{uuid}.{jpg|pdf}` (never `public`). Images re-encoded to JPEG q85, longest edge ≤ 2000 px, which drops EXIF/GPS; undecodable images → friendly error. PDFs stored as uploaded (GD cannot re-encode them). One current proof per booking: re-upload replaces the pending downpayment Payment's file (old file deleted after commit); uploads allowed only while the booking is pending; logged `payment.proof_uploaded`. Admin viewing route arrives in M6. | PLAN.md §5.6. | M5 |
 | D-027 | 2026-10-01 | Public content comes only from DB/settings: new SettingGroups `content` (tagline, hero, about, highlights, house rules, cancellation policy, booking success note) and `seo` (meta description, share image; fallback = first visible gallery image). Long owner text rendered by `x-ui.prose` with `Str::markdown(html_input=strip, allow_unsafe_links=false)`. Empty settings/collections hide their section (`x-ui.section :when`). `$site` shared to `layouts.public`, `partials.head`, `public.*` by a view composer. | No hard-coded rates or text; safe owner formatting. | M5 |
 | D-028 | 2026-10-01 | Anti-abuse: named limiters per IP — `booking-read` 60/min (calendar, quote), `booking-write` 5/min + 20/day (POST /book), `proof-upload` 10/min, `track` 10/min (POST /track); honeypot field `website` must be empty; Cloudflare Turnstile behind `config('wonderpool.turnstile.enabled')` (env TURNSTILE_ENABLED, default false) via implicit rule `App\Rules\Turnstile`. The booking page JS only displays server JSON; price/availability are never computed client-side. | PLAN.md §10. | M5 |
+| D-029 | 2026-10-01 | Permission matrix (answers PLAN.md §14 Q6). **Owner:** everything. **Staff:** bookings list/detail/receipt, approve, reject, cancel, complete, reschedule, internal notes, record payments, verify/reject pending payments, view proofs, walk-ins. **Owner only:** price override on walk-ins, voiding a verified payment, plus all owner modules (content, pricing rules, blocked dates, users, settings, financial figures). Enforced by `BookingPolicy`/`PaymentPolicy` (+ gate `manage-bookings` for the nav); booking routes are NOT behind `role:owner`. | Owner decision in the M6 plan. | M6 |
+| D-030 | 2026-10-01 | Payments: only `verified` payments count. Admin-recorded payments are verified immediately (`recorded_by`, `verified_by`). Approval (`BookingAdminService::approve`) first verifies pending proofs, then requires verified ≥ `downpayment_required_cents`; otherwise the whole approval (incl. auto-verification) rolls back with `DownpaymentNotCoveredException` naming the amount still due. Rejecting a payment needs a reason (shown to the guest); a rejected proof lets the guest upload a new one. Derived `PaymentState`: paid (verified ≥ total) → proof_pending → partial → unpaid, same precedence in `PaymentService::summary()` and `Booking::scopePaymentState()`. Cancelling keeps payments on file (refunds handled outside the system). | Owner decision ("downpayment covered"). | M6 |
+| D-031 | 2026-10-01 | Walk-ins: `BookingAdminService::createWalkIn` → `BookingService::create` with `source=admin`, `created_by`; no lead-time rule (a window may have started but not ended); optional payment record and immediate approval in ONE transaction (all or nothing). Owner-only price override: `price_override_cents` + mandatory reason; quote kept in `original_total_cents`, downpayment recomputed with the quoted percent; logged `booking.price_overridden` {from,to,reason}. Checked in StoreWalkInRequest (403 for staff) and again in BookingService. | Flexibility at the counter with an audit trail. | M6 |
+| D-032 | 2026-10-01 | Proofs are viewed only through `GET /admin/payments/{payment}/proof` (auth + active + PaymentPolicy::viewProof), streamed inline from the private `local` disk with `Cache-Control: private, no-store` and `nosniff`; 404 if no file. No public URL is ever generated. | PLAN.md §5.6 / §10. | M6 |
+| D-033 | 2026-10-01 | Admin bookings index: ILIKE search on reference, name, phone, email (+ exact match of a normalized PH phone), filters status/package/stay dates/payment state, sort whitelist (`BookingAdminService::SORTABLE`), status tab counts from one GROUP BY. Receipts use `layouts/print` with an embedded `<style>` block (documented exception to "no inline styles": DomPDF cannot load Vite/Tailwind); no `style=` attributes. | Fast lookup at the front desk; printable/PDF receipts. | M6 |
 | D-014 | 2026-10-01 | Database engine is PostgreSQL. Switched from MySQL on 2026-10-01 because MySQL does not run on the dev machine. JSON columns are jsonb (no key-order guarantee); emails stored lowercase via User/Booking mutators; booking creation to be serialized with `pg_advisory_xact_lock` (PLAN.md §5.2). | Local MariaDB unusable; PostgreSQL available locally and in CI. | M0.1 |
 
 ## Folder Map
@@ -66,15 +72,16 @@
 | `app/Exceptions/Booking/` | BookingException base + SlotUnavailable, GuestCountExceeded, InvalidAddOn, PackageUnavailable, InvalidStatusTransition, ReferenceCodeExhausted (M4); BookingWindow, PaymentProofNotAllowed, InvalidPaymentProof (M5) — messages safe to show | M4/M5 |
 | `app/Events/BookingStatusChanged.php` | Fired after each committed status change (listeners in M8) | M4 |
 | `app/Console/Commands/ExpireStaleBookings.php` | `bookings:expire-stale {--dry-run}` | M4 |
-| `app/Http/Controllers/Admin/` | Admin controllers; `Auth/` = Login, Password; content: Package, AddOn, Amenity, Gallery, Faq (M3) | M2/M3 |
+| `app/Http/Controllers/Admin/` | Admin controllers; `Auth/` = Login, Password; content: Package, AddOn, Amenity, Gallery, Faq (M3); BlockedDate, PricingRule (M4); BookingController, BookingActionController, PaymentController (M6) | M2/M3/M4/M6 |
 | `app/Http/Controllers/Public/` | PageController (pages, sitemap, robots), BookingController (book, calendar, quote, store, payment, proof, done), TrackBookingController | M5 |
 | `app/Http/Requests/Public/` | QuoteRequest, StoreBookingRequest (extends Quote), UploadPaymentProofRequest, TrackBookingRequest | M5 |
 | `app/Rules/` | PhilippineMobile, Turnstile (implicit, off by default) | M5 |
 | `app/Http/Middleware/` | EnsureUserIsActive (`active`), EnsurePasswordIsChanged (`password.changed`), EnsureUserHasRole (`role`); aliases in bootstrap/app.php | M2 |
 | `app/Http/Requests/Admin/` | Admin Form Requests (login, passwords, users, settings) | M2 |
 | `app/Http/Requests/Admin/Content/` | `{Module}Request` base (rules + payload()) with Store/Update subclasses; StoreGalleryImagesRequest, UpdateGalleryImageRequest, ReorderRequest, ImageRules | M3 |
-| `app/Policies/` | UserPolicy; ContentPolicy base + Package/AddOn/Amenity/GalleryImage/Faq policies (owner only) | M2/M3 |
-| `app/Providers/AppServiceProvider.php` | Service singletons (+ ImageManager GD) + gates (manage-settings, manage-users, manage-content, view-financials) | M2/M3 |
+| `app/Http/Requests/Admin/Booking/` | BookingReasonRequest, RescheduleBookingRequest, UpdateBookingNotesRequest, RecordPaymentRequest, RejectPaymentRequest, AdminQuoteRequest, StoreWalkInRequest | M6 |
+| `app/Policies/` | UserPolicy; ContentPolicy base + Package/AddOn/Amenity/GalleryImage/Faq/BlockedDate/PricingRule policies (owner only); BookingPolicy, PaymentPolicy (owner + staff, D-029) | M2/M3/M4/M6 |
+| `app/Providers/AppServiceProvider.php` | Service singletons (+ ImageManager GD), gates (manage-settings, manage-users, manage-content, view-financials, manage-bookings), rate limiters, public view composer | M2/M3/M5/M6 |
 | `app/Services/` | Business logic (see Services Index); `Content/` = content modules + images; `Booking/` = availability, pricing, booking lifecycle, blocked dates | M2/M3/M4 |
 | `app/Models/Concerns/AdminListable.php` | search() ILIKE, whereState(), adminLabel(), adminSearchColumns() | M3 |
 | `app/Models/Contracts/GuardsDeletion.php` | deletionBlockedReason() | M3 |
@@ -91,11 +98,12 @@
 | `resources/css/app.css` | Tailwind v4 entry + `@theme` tokens + Poppins imports (D-002) | M0 |
 | `resources/js/app.js` | Alpine + focus plugin bootstrap; registers `sortable` | M0/M3 |
 | `resources/js/sortable.js` | Alpine drag-and-drop/keyboard reorder → PATCH {ids} | M3 |
-| `resources/js/booking.js` | Alpine `bookingForm`: steps, calendar fetch, debounced quote fetch (display only) | M5 |
-| `resources/views/layouts/` | `public.blade.php` (guest site: `$nav`, footer from `$site`), `admin.blade.php` (sidebar/drawer, `$nav` array, account menu), `auth.blade.php` (login / change password) | M0/M2/M5 |
+| `resources/js/booking.js` | Alpine `bookingForm`: steps, calendar fetch, debounced quote fetch (display only); `extra` params for admin (M6) | M5/M6 |
+| `resources/views/layouts/` | `public.blade.php` (guest site: `$nav`, footer from `$site`), `admin.blade.php` (sidebar/drawer, `$nav` array, account menu), `auth.blade.php` (login / change password), `print.blade.php` (receipts/PDF, D-033) | M0/M2/M5/M6 |
+| `resources/views/partials/` | `head`, `admin-sidebar`, `availability-calendar` + `quote-panel` (shared by public booking, walk-in, reschedule, M6) | M0/M6 |
 | `resources/views/public/` | home, amenities, packages, gallery, faq, contact, policies, sitemap; `book/{index,payment,done,_summary,_proof-form}`; `track/{index,show}` | M5 |
 | `storage/app/private/payment-proofs/{booking_id}/` | Guest payment proofs (private disk, D-026; not in git) | M5 |
-| `resources/views/admin/` | `dashboard`, `auth/{login,change-password}`, `users/{index,create,edit}`, `settings/edit`; `{packages,add-ons,amenities,faqs}/{index,create,edit,_form}`, `gallery/{index,create,edit}` (M3); `{blocked-dates,pricing-rules}/{index,create,edit,_form}` (M4) | M2/M3/M4 |
+| `resources/views/admin/` | `dashboard`, `auth/{login,change-password}`, `users/{index,create,edit}`, `settings/edit`; `{packages,add-ons,amenities,faqs}/{index,create,edit,_form}`, `gallery/{index,create,edit}` (M3); `{blocked-dates,pricing-rules}/{index,create,edit,_form}` (M4); `bookings/{index,create,show,receipt}` (M6) | M2/M3/M4/M6 |
 | `storage/app/public/{gallery,amenities}/{originals,large,thumbs}/` | Uploaded content images (D-018; not in git) | M3 |
 | `resources/views/partials/` | `head` (meta, vite, styles stack), `admin-sidebar` (nav list) | M0 |
 | `resources/views/components/ui/` | Shared UI components (x-ui.*) | M0 |
@@ -112,6 +120,7 @@
 | `tests/Feature/Admin/Content/` | PackagesTest, AddOnsTest, AmenitiesTest, GalleryTest, FaqsTest, ContentAccessTest | M3 |
 | `tests/Feature/Booking/` | AvailabilityServiceTest, PricingServiceTest, ReferenceCodeGeneratorTest, BookingServiceTest (lock, constraint, transitions, reschedule), ExpireStaleBookingsTest | M4 |
 | `tests/Feature/Admin/Booking/` | BlockedDatesTest, PricingRulesTest | M4 |
+| `tests/Feature/Admin/Bookings/` | BookingIndexTest, BookingActionsTest, PaymentsTest, WalkInAndReceiptTest | M6 |
 | `tests/Feature/Public/` | PagesTest, BookingFlowTest, QuoteEndpointTest, TrackBookingTest, AntiAbuseTest | M5 |
 | `tests/Unit/PhoneNumberTest.php` | Phone normalization | M5 |
 | `tests/Pest.php` | Helpers dayPackage(), nightPackage(), fullDayPackage(), bookingData() | M4 |
@@ -138,6 +147,17 @@
 | POST | `/admin/logout` | admin.logout | Admin\Auth\LoginController@destroy | auth, active | M2 |
 | GET/PUT | `/admin/password` | admin.password.edit / .update | Admin\Auth\PasswordController@edit/update | auth, active | M2 |
 | GET | `/admin` | admin.dashboard | Admin\DashboardController (invokable) | auth, active, password.changed | M2 |
+| GET | `/admin/bookings` (?q,status,package,payment,from,to,sort,dir) | admin.bookings.index | Admin\BookingController@index | auth, active, password.changed (owner+staff) | M6 |
+| GET/POST | `/admin/bookings/create`, `/admin/bookings` | admin.bookings.create / .store | Admin\BookingController@create/store (walk-in) | same | M6 |
+| GET | `/admin/bookings/calendar` (?package_id,month,booking) | admin.bookings.calendar | Admin\BookingController@calendar (JSON, admin mode) | same | M6 |
+| POST | `/admin/bookings/quote` | admin.bookings.quote | Admin\BookingController@quote (JSON, admin mode) | same | M6 |
+| GET | `/admin/bookings/{booking}` | admin.bookings.show | Admin\BookingController@show | same | M6 |
+| GET | `/admin/bookings/{booking}/receipt` (?pdf=1) | admin.bookings.receipt | Admin\BookingController@receipt | same | M6 |
+| POST | `/admin/bookings/{booking}/{approve,reject,cancel,complete,reschedule}` | admin.bookings.{action} | Admin\BookingActionController@{action} | same | M6 |
+| PATCH | `/admin/bookings/{booking}/notes` | admin.bookings.notes | Admin\BookingActionController@notes | same | M6 |
+| POST | `/admin/bookings/{booking}/payments` | admin.bookings.payments.store | Admin\PaymentController@store | same | M6 |
+| PATCH | `/admin/payments/{payment}/verify`, `/reject` | admin.payments.verify / .reject | Admin\PaymentController@verify/reject | same | M6 |
+| GET | `/admin/payments/{payment}/proof` | admin.payments.proof | Admin\PaymentController@proof (private disk stream, D-032) | same | M6 |
 | GET | `/admin/settings` | admin.settings.index | redirect → /admin/settings/general | + role:owner | M2 |
 | GET/PUT | `/admin/settings/{group}` | admin.settings.edit / .update | Admin\SettingController@edit/update ({group} = SettingGroup) | + role:owner | M2 |
 | resource | `/admin/users` (except show, destroy) | admin.users.* | Admin\UserController | + role:owner | M2 |
@@ -160,9 +180,9 @@
 | packages | code UK, base_price_cents, start_time, end_time, crosses_midnight, max_pax, is_active, sort_order | → bookings (restrict), pricing_rules (cascade) | M1 |
 | add_ons | price_cents, is_active | → booking_add_ons (restrict) | M1 |
 | pricing_rules | package_id?, type, starts_on, ends_on, days_of_week json, adjustment_type, adjustment_value, priority | package (null = global) | M1 |
-| bookings | reference_code UK, package_id, starts_at, ends_at, total_amount_cents, downpayment_required_cents, status, approved_by; soft deletes; IDX (starts_at,ends_at), status, guest_phone; EXCLUDE `bookings_no_overlap` (D-021, M4) | package, approver, booking_add_ons, payments | M1/M4 |
+| bookings | reference_code UK, package_id, starts_at, ends_at, total_amount_cents, downpayment_required_cents, status, approved_by, source (M6), created_by (M6), original_total_cents (M6), price_override_reason (M6), cancellation_reason (M6); soft deletes; IDX (starts_at,ends_at), status, guest_phone; EXCLUDE `bookings_no_overlap` (D-021, M4) | package, approver, creator (set null), booking_add_ons, payments | M1/M4/M6 |
 | booking_add_ons | booking_id, add_on_id (UK pair), quantity, unit_price_cents | booking (cascade), add_on (restrict) | M1 |
-| payments | booking_id, type, amount_cents, proof_path, status, reference_no, verified_by | booking (cascade), verifier (set null) | M1 |
+| payments | booking_id, type, amount_cents, proof_path, status, reference_no, verified_by, notes (M6), recorded_by (M6), rejection_reason (M6) | booking (cascade), verifier (set null), recorder (set null) | M1/M6 |
 | blocked_dates | starts_at, ends_at, reason, created_by | creator (set null) | M1 |
 | amenities | name, icon (heroicon), image_path, is_active, sort_order | — | M1 |
 | gallery_images | path, caption, category, is_visible, sort_order | — | M1 |
@@ -180,8 +200,8 @@ Full dictionary + ERD: `docs/database.md`.
 | AddOn | bookings (belongsToMany via BookingAddOn) | active(); formatted_price; AdminListable (name, description); GuardsDeletion (any booking_add_ons row) | M1/M3 |
 | BookingAddOn (Pivot) | booking, addOn | line_total_cents, formattedLineTotal() | M1 |
 | PricingRule | package | active(), forPackage($id); AdminListable (name) | M1/M4 |
-| Booking | package, approver (User), addOns (pivot quantity/unit_price_cents), payments | active() (pending+approved), overlapping($s,$e), status($enum); formatted_total, formatted_downpayment; guest_email mutator lowercases (D-014); SoftDeletes | M1 |
-| Payment | booking, verifier (User) | verified(); formatted_amount | M1 |
+| Booking | package, approver (User), addOns (pivot quantity/unit_price_cents), payments | active() (pending+approved), overlapping($s,$e), status($enum); formatted_total, formatted_downpayment; guest_email mutator lowercases (D-014); SoftDeletes ; creator (M6); scopes search() ILIKE + phone, startingBetween(), paymentState(PaymentState) (M6); casts source→BookingSource | M1/M6 |
+| Payment | booking, verifier (User), recorder (User, M6) | verified(); formatted_amount; hasProof(), proofIsPdf() (M6) | M1/M6 |
 | BlockedDate | creator (User) | overlapping($s,$e); AdminListable (reason; label = reason + date); isWholeDays() | M1/M4 |
 | Amenity | — | active(), ordered(); AdminListable (name, description); imageUrl(ImageVariant) | M1/M3 |
 | GalleryImage | — | visible(), ordered(); AdminListable (caption; state column is_visible; label = caption or "Image #id"); imageUrl(ImageVariant) | M1/M3 |
@@ -199,8 +219,10 @@ Full dictionary + ERD: `docs/database.md`.
 | PricingRuleType | weekend, holiday, season; label() | M1 |
 | PricingAdjustmentType | percent (whole % points), fixed (signed centavos); label() | M1 |
 | GalleryCategory | pools, rooms, hall, events; label() | M1 |
-| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated, content.created/updated/deleted/reordered (M3), booking.created/status_changed/rescheduled/expired (M4), payment.proof_uploaded (M5); label(); add cases per module | M2/M3/M4/M5 |
+| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated, content.created/updated/deleted/reordered (M3), booking.created/status_changed/rescheduled/expired (M4), payment.proof_uploaded (M5), booking.price_overridden/notes_updated, payment.recorded/verified/rejected (M6); label(); add cases per module | M2/M3/M4/M5/M6 |
 | ImageVariant | originals, large (1600), thumbs (480); maxEdge() (D-018) | M3 |
+| BookingSource | guest, admin; label() | M6 |
+| PaymentState | unpaid, proof_pending, partial, paid (derived, D-030); label(), color() | M6 |
 | SettingGroup | general, booking, payment, contact, social; label(), icon(), fields() = settings registry (D-017) | M2 |
 
 ## Services Index
@@ -214,14 +236,16 @@ Full dictionary + ERD: `docs/database.md`.
 | Content\ImageService | store(UploadedFile, dir) → original path, delete(?path), static variantPath(path, ImageVariant), static url(?path, ImageVariant) (D-018) | M3 |
 | Content\AmenityService | create(data, ?image), update(amenity, data, ?image, removeImage), delete(amenity) | M3 |
 | Content\GalleryService | upload(files, GalleryCategory, ?caption, visible) → list, update, toggleVisibility, delete | M3 |
-| Booking\AvailabilityService | resolveWindow(Package, CarbonInterface $date): array{starts_at: CarbonImmutable, ends_at: CarbonImmutable}; isAvailable(CarbonInterface $start, CarbonInterface $end, ?int $ignoreBookingId = null): bool; conflicts($start, $end, ?$ignoreBookingId): array{bookings, blocks}; unavailableDates(CarbonInterface $from, CarbonInterface $to, ?Package $package = null): array<Y-m-d, array{available: bool, packages: array<int, bool>}>; isWithinBookingWindow(CarbonInterface $start, ?CarbonInterface $now = null): bool | M4 |
+| Booking\AvailabilityService | resolveWindow(Package, CarbonInterface $date): array{starts_at: CarbonImmutable, ends_at: CarbonImmutable}; isAvailable(CarbonInterface $start, CarbonInterface $end, ?int $ignoreBookingId = null): bool; conflicts($start, $end, ?$ignoreBookingId): array{bookings, blocks}; unavailableDates(CarbonInterface $from, CarbonInterface $to, ?Package $package = null, ?int $ignoreBookingId = null): array<Y-m-d, array{available: bool, packages: array<int, bool>}>; isWithinBookingWindow(CarbonInterface $start, ?CarbonInterface $now = null): bool | M4/M6 |
 | Booking\PricingService | quote(Package, CarbonInterface $date, array $addOns = [id => qty], int $guestCount = 1): PriceBreakdown (@throws GuestCountExceeded, InvalidAddOn); matchingRules(Package, CarbonInterface): Collection<PricingRule>; applyRule(int $amountCents, PricingRule): int; static percentOf(int $cents, int $percent): int; ruleLabel(PricingRule): string | M4 |
 | Booking\PriceBreakdown | readonly: packageId, date, guestCount, basePriceCents, adjustments[{rule_id,label,delta_cents,running_cents}], packageSubtotalCents, addOns[{add_on_id,name,quantity,unit_price_cents,line_total_cents}], addOnsTotalCents, totalCents, downpaymentPercent, downpaymentRequiredCents; toArray() | M4 |
 | Booking\ReferenceCodeGenerator | generate(CarbonInterface $startsAt): string (@throws ReferenceCodeExhausted); static pattern(): string; constants PREFIX, ALPHABET, RANDOM_LENGTH, MAX_ATTEMPTS | M4 |
-| Booking\BookingService | create(array $data, ?User $actor = null): Booking (@throws PackageUnavailable, SlotUnavailable, GuestCountExceeded, InvalidAddOn, ReferenceCodeExhausted); transition(Booking, BookingStatus $to, ?User $actor, ?string $reason = null): Booking (@throws InvalidStatusTransition); canTransition(Booking, BookingStatus): bool; reschedule(Booking, CarbonInterface $newDate, ?User $actor, ?Package $newPackage = null, bool $reprice = false): Booking (@throws InvalidStatusTransition, PackageUnavailable, SlotUnavailable, GuestCountExceeded, InvalidAddOn); expireStale(?CarbonInterface $now = null, bool $dryRun = false): int; const TRANSITIONS, BOOKING_LOCK_KEY | M4 |
+| Booking\BookingService | create(array $data, ?User $actor = null): Booking — data may include source, created_by, price_override_cents + price_override_reason (owner, D-031) (@throws PackageUnavailable, SlotUnavailable, GuestCountExceeded, InvalidAddOn, ReferenceCodeExhausted, PriceOverrideNotAllowed); transition stores cancellation_reason (M6); transition(Booking, BookingStatus $to, ?User $actor, ?string $reason = null): Booking (@throws InvalidStatusTransition); canTransition(Booking, BookingStatus): bool; reschedule(Booking, CarbonInterface $newDate, ?User $actor, ?Package $newPackage = null, bool $reprice = false): Booking (@throws InvalidStatusTransition, PackageUnavailable, SlotUnavailable, GuestCountExceeded, InvalidAddOn); expireStale(?CarbonInterface $now = null, bool $dryRun = false): int; const TRANSITIONS, BOOKING_LOCK_KEY | M4/M6 |
 | Booking\BlockedDateService | create(array $data, User $actor): array{block, conflicts}; update(BlockedDate, array): array{block, conflicts}; delete(BlockedDate); overlappingBookings(BlockedDate): Collection<Booking> | M4 |
-| Booking\GuestBookingService | calendar(Package, CarbonInterface $month): array{month, label, days: array<Y-m-d, available|booked|closed>, has_previous, has_next}; quote(Package, CarbonInterface $date, int $guestCount, array $addOns = []): array{available, reason, window, breakdown}; book(array $data): Booking (@throws BookingWindow, PackageUnavailable, SlotUnavailable, GuestCountExceeded, InvalidAddOn, ReferenceCodeExhausted); find(string $reference, string $phone): ?Booking; static normalizeReference(string): string; timeline(Booking): list<array{at, label, note, tone}>; remember(Booking); canAccess(Booking): bool; paymentInstructions(): ?string; windowLabel($start, $end): string | M5 |
+| Booking\GuestBookingService | calendar(Package, CarbonInterface $month, ?int $ignoreBookingId = null, bool $enforceBookingWindow = true): array{month, label, days: array<Y-m-d, available|booked|closed>, has_previous, has_next}; quote(Package, CarbonInterface $date, int $guestCount, array $addOns = [], ?int $ignoreBookingId = null, bool $enforceBookingWindow = true): array{available, reason, window, breakdown}; book(array $data): Booking (@throws BookingWindow, PackageUnavailable, SlotUnavailable, GuestCountExceeded, InvalidAddOn, ReferenceCodeExhausted); find(string $reference, string $phone): ?Booking; static normalizeReference(string): string; timeline(Booking): list<array{at, label, note, tone}>; remember(Booking); canAccess(Booking): bool; paymentInstructions(): ?string; windowLabel($start, $end): string | M5/M6 |
 | Booking\PaymentProofService | store(Booking, UploadedFile, ?string $referenceNo = null): Payment (@throws PaymentProofNotAllowed, InvalidPaymentProof); constants DISK=local, DIRECTORY, MAX_EDGE, QUALITY (D-026) | M5 |
+| Booking\PaymentService | record(Booking, PaymentType, int $amountCents, User $actor, ?string $referenceNo = null, ?string $notes = null): Payment (verified; @throws PaymentActionNotAllowed); verify(Payment, User): Payment (@throws PaymentActionNotAllowed); reject(Payment, User, string $reason): Payment (void verified = owner; @throws PaymentActionNotAllowed); verifyPendingProofs(Booking, User): int; summary(Booking): array{total, verified, pending, balance_due, downpayment_required, downpayment_covered, state: PaymentState} (D-030) | M6 |
+| Booking\BookingAdminService | approve(Booking, User): Booking (@throws DownpaymentNotCovered, InvalidStatusTransition); reject(Booking, User, string $reason); cancel(Booking, User, ?string $reason); complete(Booking, User); reschedule(Booking, CarbonInterface $date, User, ?Package, bool $reprice); updateNotes(Booking, User, ?string); createWalkIn(array $data, User): Booking (@throws BookingException; D-031); timeline(Booking): list<array{at, action, label, actor, details}>; statusCounts(): array<status, int>; listing(array $filters, int $perPage = 20): LengthAwarePaginator (D-033); const SORTABLE | M6 |
 | PublicContentService | site(): array{name, tagline, phone, email, address, map_embed_url, facebook_url, instagram_url, meta_description, og_image_url}; text(key): ?string; highlights(): list<string>; packages(); addOns(); amenities(?limit); gallery(?limit); faqs() — active/visible only (D-027) | M5 |
 
 ## Blade Components
@@ -252,6 +276,7 @@ Full dictionary + ERD: `docs/database.md`.
 | `x-public.page-hero` | title*, subtitle; slot | inner public pages | M5 |
 | `x-public.package-card` | package* | home, packages | M5 |
 | `x-public.amenity-card` | amenity* | home, amenities | M5 |
+| `partials.availability-calendar` / `partials.quote-panel` | (include inside `x-data="bookingForm(config)"`) | public booking, walk-in, reschedule modal | M6 |
 
 ## Settings Keys
 Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this table documents them.
@@ -315,6 +340,13 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 5. `/book/{ref}`: summary + how to pay → upload proof (UploadPaymentProofRequest → PaymentProofService::store, private disk) → `/book/{ref}/done`: reference code (copy button), next steps, track link.
 6. Later: `/track` (code + phone, normalized) → `/track/{ref}`: status, guest-safe timeline (created, proof received, approved/rejected + reason, cancelled/expired, moved, completed), upload/replace proof while pending.
 - Engine (M4): `BookingService::create()` → advisory lock → package active? → `resolveWindow` → `isAvailable` → `PricingService::quote` → insert pending booking + `booking_add_ons` snapshot + reference code → `booking.created` log. Admin approval UI in M6.
+### Approval & payment flow (M6)
+1. Guest books (pending) and uploads a proof → Payment(downpayment, pending, proof_path). Index shows payment state "Proof to review".
+2. Admin opens the booking → "View proof" streams the private file (D-032) → either **Reject payment** (reason → guest sees "Payment proof not accepted", can re-upload) or **Approve**.
+3. **Approve** = verify pending proofs + check verified ≥ downpayment → BookingService::transition(approved) (approved_by/at, log, BookingStatusChanged). Not covered → nothing changes, flash says how much is still due; admin can **Record payment** (cash/GCash/bank, verified immediately) and approve again.
+4. Balance: record `balance`/`full` payments any time; summary shows verified, awaiting review, balance due. Owner can void a verified payment with a reason.
+5. After the stay: **Mark completed** (only once ends_at has passed). **Cancel** (optional reason) or **Reschedule** (admin calendar ignoring itself; optional reprice) while pending/approved. Receipt (print/PDF) at any time.
+6. Walk-ins: same rules, created by an admin with optional payment + immediate approval; owner may override the price with a reason (D-031).
 ### Status lifecycle
 - `BookingService::TRANSITIONS`: pending → approved | rejected | cancelled; approved → completed | cancelled; rejected, cancelled, completed are final. Proof upload keeps `pending` (payment status tracks verification).
 - Preconditions: rejected needs a reason (stored in rejection_reason); approved stamps approved_by/approved_at; completed only after `ends_at`. Only pending/approved bookings hold the slot and can be rescheduled.
@@ -332,7 +364,9 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 - Resolved in M0.1: local MariaDB was unusable, so the project moved to PostgreSQL (D-014); schema verified with migrate:fresh --seed, rollback and re-migrate on PostgreSQL 18. (M0/M1/M0.1)
 - Settings contact/payment/social values are placeholders; replace once the owner answers PLAN.md §14 Q5. (M1)
 - Day package hours (7AM–5PM) and Day max pax (50) are proposed defaults pending owner confirmation (PLAN.md §1). (M1)
-- Admin nav lists built modules only; add Bookings/Reports entries to `$nav` in layouts/admin.blade.php as they ship (M6/M7). (M0/M2)
+- Admin nav lists built modules only; add Reports/Activity log entries to `$nav` in layouts/admin.blade.php in M7. (M0/M2/M6)
+- Admin booking modals (reschedule calendar, proof preview) and the receipt print button were not run in a real browser in M6 (Chrome extension unavailable); endpoints and markup are tested. (M6)
+- Cancelling does not create refund records; refunds are handled outside the system (D-030). (M6)
 - Booking page JS (calendar, quote, steps), gallery lightbox and copy button were not run in a real browser in M5 (Chrome extension unavailable); server endpoints/markup are tested. Manual check recommended. (M5)
 - PDF proofs are stored as uploaded (metadata not stripped). (M5)
 - Settings content/house rules/cancellation policy are placeholders until the owner provides them (§14). (M5)

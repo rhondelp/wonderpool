@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property int|null $subject_id
  * @property array<string, mixed>|null $properties
  * @property Carbon $created_at
+ * @property-read User|null $user Actor (null = guest/system)
  */
 class ActivityLog extends Model
 {

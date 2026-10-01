@@ -15,6 +15,28 @@ ENTRY TEMPLATE
 
 ## Unreleased
 
+## [M6] Admin bookings & payments - 2026-10-01
+### Added
+- Migration: bookings source, created_by, original_total_cents, price_override_reason, cancellation_reason; payments notes, recorded_by, rejection_reason (files: database/migrations/2026_10_01_001600_add_admin_fields_to_bookings_and_payments.php)
+- Enums BookingSource, PaymentState; ActivityAction booking.price_overridden/notes_updated, payment.recorded/verified/rejected (files: app/Enums/{BookingSource,PaymentState,ActivityAction}.php)
+- PaymentService (record/verify/reject/void/summary) and BookingAdminService (approve with downpayment rule, reject, cancel, complete, reschedule, notes, walk-ins, timeline, counts, listing) (files: app/Services/Booking/{PaymentService,BookingAdminService}.php)
+- Exceptions DownpaymentNotCovered, PaymentActionNotAllowed, PriceOverrideNotAllowed (files: app/Exceptions/Booking/*.php)
+- Admin bookings index (tabs, filters, ILIKE search, sorting, payment state), detail page (snapshot, payments, proof preview modal, timeline, notes, action modals), walk-in form with owner price override, receipt view + PDF (files: app/Http/Controllers/Admin/{BookingController,BookingActionController,PaymentController}.php, app/Http/Requests/Admin/Booking/*.php, resources/views/admin/bookings/*.blade.php, resources/views/layouts/print.blade.php)
+- BookingPolicy, PaymentPolicy, gate manage-bookings, nav entry (files: app/Policies/{BookingPolicy,PaymentPolicy}.php, app/Providers/AppServiceProvider.php, resources/views/layouts/admin.blade.php, routes/web.php)
+- Shared calendar/quote partials (files: resources/views/partials/{availability-calendar,quote-panel}.blade.php)
+- Tests: index, actions, payments + proof access, walk-ins, override, receipts (files: tests/Feature/Admin/Bookings/*.php)
+- Dependency barryvdh/laravel-dompdf 3.1 (files: composer.json, composer.lock)
+### Changed
+- BookingService::create supports source/created_by/owner price override; transition stores cancellation_reason (files: app/Services/Booking/BookingService.php)
+- AvailabilityService::unavailableDates and GuestBookingService::calendar/quote gain admin mode (ignore booking, no lead time); guest timeline shows payment confirmed / not accepted (files: app/Services/Booking/{AvailabilityService,GuestBookingService}.php)
+- Booking model scopes search/startingBetween/paymentState; Payment fields + helpers; ActivityLog user typed nullable (files: app/Models/{Booking,Payment,ActivityLog}.php)
+- Public booking page uses the shared partials; booking.js accepts `extra` params; dashboard rows link to bookings (files: resources/views/public/book/index.blade.php, resources/js/booking.js, resources/views/admin/dashboard.blade.php)
+- Admin guide: managing bookings (files: docs/admin-guide.md)
+### DB: added 2026_10_01_001600_add_admin_fields_to_bookings_and_payments (reversible)
+### Routes: added admin.bookings.{index,create,store,calendar,quote,show,receipt,approve,reject,cancel,complete,reschedule,notes,payments.store}, admin.payments.{verify,reject,proof}
+### Breaking / Notes
+- Run `php artisan migrate`. Staff now see Bookings (D-029).
+
 ## [M5] Public site & booking flow - 2026-10-01
 ### Added
 - Public pages home, amenities, packages & rates (+ add-ons), gallery (category filter + Alpine lightbox), FAQ, contact, policies, sitemap.xml, robots.txt; all content from DB/settings, empty sections hidden (files: app/Http/Controllers/Public/PageController.php, app/Services/PublicContentService.php, resources/views/public/*.blade.php)

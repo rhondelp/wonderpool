@@ -32,7 +32,7 @@
                     <tbody class="divide-y divide-slate-100">
                         @foreach ($upcoming as $booking)
                             <tr>
-                                <td class="whitespace-nowrap px-5 py-3 font-medium text-slate-900">{{ $booking->reference_code }}</td>
+                                <td class="whitespace-nowrap px-5 py-3 font-medium"><a href="{{ route('admin.bookings.show', $booking) }}" class="font-mono text-pool-800 hover:underline">{{ $booking->reference_code }}</a></td>
                                 <td class="px-5 py-3">{{ $booking->guest_name }}</td>
                                 <td class="px-5 py-3">{{ $booking->package->name }}</td>
                                 <td class="whitespace-nowrap px-5 py-3">{{ $booking->starts_at->format('M j, Y g:i A') }}</td>
