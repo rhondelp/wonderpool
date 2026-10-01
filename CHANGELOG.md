@@ -15,6 +15,29 @@ ENTRY TEMPLATE
 
 ## Unreleased
 
+## [M5] Public site & booking flow - 2026-10-01
+### Added
+- Public pages home, amenities, packages & rates (+ add-ons), gallery (category filter + Alpine lightbox), FAQ, contact, policies, sitemap.xml, robots.txt; all content from DB/settings, empty sections hidden (files: app/Http/Controllers/Public/PageController.php, app/Services/PublicContentService.php, resources/views/public/*.blade.php)
+- Settings groups "Website content" and "SEO" (files: app/Enums/SettingGroup.php)
+- Components x-ui.wave-divider, x-ui.section, x-ui.prose (safe Markdown-lite), x-public.page-hero, x-public.package-card, x-public.amenity-card (files: resources/views/components/ui/{wave-divider,section,prose}.blade.php, resources/views/components/public/*.blade.php)
+- 3-step booking page with availability calendar and live quotes (Alpine), no-JS fallback, payment step, success page with copy button (files: app/Http/Controllers/Public/BookingController.php, resources/views/public/book/*.blade.php, resources/js/booking.js, resources/js/app.js)
+- Track booking by reference + mobile with status timeline and proof upload/replace (files: app/Http/Controllers/Public/TrackBookingController.php, resources/views/public/track/*.blade.php)
+- GuestBookingService, PaymentProofService (private disk, image re-encode/metadata strip), PhoneNumber, PhilippineMobile and Turnstile rules, new booking exceptions (files: app/Services/Booking/{GuestBookingService,PaymentProofService}.php, app/Support/PhoneNumber.php, app/Rules/*.php, app/Exceptions/Booking/{BookingWindow,PaymentProofNotAllowed,InvalidPaymentProof}Exception.php)
+- Form Requests QuoteRequest, StoreBookingRequest, UploadPaymentProofRequest, TrackBookingRequest (files: app/Http/Requests/Public/*.php)
+- Rate limiters booking-read/booking-write/proof-upload/track, honeypot, Turnstile config flag (files: app/Providers/AppServiceProvider.php, config/wonderpool.php, .env.example)
+- ActivityAction payment.proof_uploaded; PriceBreakdown base/subtotal formatted fields (files: app/Enums/ActivityAction.php, app/Services/Booking/PriceBreakdown.php)
+- Tests: pages/SEO, booking flow, EXIF stripping, quote/calendar endpoints, tracking, rate limits, Turnstile, phone normalization (files: tests/Feature/Public/*.php, tests/Unit/PhoneNumberTest.php)
+### Changed
+- Public layout: real nav, footer from settings, site data via view composer; head: per-page SEO, canonical, OG/Twitter tags (files: resources/views/layouts/public.blade.php, resources/views/partials/head.blade.php, app/Providers/AppServiceProvider.php)
+- Routes for public pages, booking and tracking (files: routes/web.php)
+- Docs: admin guide (website content), deployment (private proofs backup, Turnstile, upload limits) (files: docs/admin-guide.md, docs/deployment.md)
+### Removed
+- Temporary home view and static robots.txt (files: resources/views/home.blade.php, public/robots.txt)
+### DB: none (new settings rows via SettingSeeder; run `php artisan db:seed --class=SettingSeeder`)
+### Routes: added home (controller), amenities, packages, gallery, faq, contact, policies, sitemap, robots, book, book.availability, book.quote, book.store, book.payment, book.payment.store, book.done, track, track.lookup, track.show
+### Breaking / Notes
+- Run `php artisan db:seed --class=SettingSeeder` on existing databases to add the new content/SEO keys (never overwrites edits).
+
 ## [M4] Booking engine - 2026-10-01
 ### Added
 - AvailabilityService: windows incl. midnight crossing, half-open overlap checks vs active bookings and blocked dates, conflicts(), two-query calendar map, booking-window check (files: app/Services/Booking/AvailabilityService.php)
