@@ -27,7 +27,7 @@ class OwnerSeeder extends Seeder
         }
 
         User::query()->updateOrCreate(
-            ['email' => $email],
+            ['email' => mb_strtolower(trim($email))],
             [
                 'name' => (string) config('wonderpool.owner.name', 'Resort Owner'),
                 'password' => $password,

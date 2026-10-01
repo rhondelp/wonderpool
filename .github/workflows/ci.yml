@@ -10,6 +10,21 @@ jobs:
   quality:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: wonderpool_user
+          POSTGRES_PASSWORD: wonderpool_ci
+          POSTGRES_DB: wonderpool_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wonderpool_user -d wonderpool_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -17,7 +32,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: mbstring, pdo_sqlite, pdo_mysql, zip
+          extensions: mbstring, pdo_pgsql, pgsql, zip
           coverage: none
 
       - name: Install Composer dependencies
@@ -46,4 +61,11 @@ jobs:
         run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
 
       - name: Pest (tests)
+        env:
+          DB_CONNECTION: pgsql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 5432
+          DB_DATABASE: wonderpool_test
+          DB_USERNAME: wonderpool_user
+          DB_PASSWORD: wonderpool_ci
         run: vendor/bin/pest

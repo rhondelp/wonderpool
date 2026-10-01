@@ -3,6 +3,7 @@
 | ID | Phase | Title | Status | Date done | Commit hash |
 |---|---|---|---|---|---|
 | M0 | 0 | Setup | Done | 2026-10-01 | 7c42f4f |
+| M0.1 | 0 | Switch database to PostgreSQL (change) | In review | 2026-10-01 | 6209193 |
 | M1 | 1 | Data layer | Done | 2026-10-01 | e1e0b27 |
 | M2 | 2 | Admin foundation | Not started | | |
 | M3 | 3 | Content modules | Not started | | |
@@ -30,6 +31,31 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 
 # Reports
 
+## M0.1 Switch database to PostgreSQL (Done 2026-10-01, commit 6209193)
+**Goal:** Replace MySQL with PostgreSQL (MySQL does not run on the dev machine). Infrastructure only: no business rules, features or UI change.
+**Delivered:**
+- PostgreSQL as default connection (`pgsql`), `.env.example` placeholders, tests on `wonderpool_test`, CI with a `postgres:16` service
+- `json` → `jsonb` (pricing_rules.days_of_week, activity_logs.properties); no MySQL enums/engine/charset/raw SQL existed
+- Emails stored trimmed + lowercase (User `email`, Booking `guest_email` mutators; OwnerSeeder normalizes the lookup key)
+- PLAN.md §5.2: booking creation serialized with `pg_advisory_xact_lock` + optional partial exclusion constraint
+- CLAUDE.md database rules; docs/README updated
+**Files created / modified:**
+- Config/CI: config/database.php, phpunit.xml, .env.example, .github/workflows/ci.yml, .gitignore
+- Code: database/migrations/2026_10_01_000400_create_pricing_rules_table.php, database/migrations/2026_10_01_001300_create_activity_logs_table.php, app/Models/User.php, app/Models/Booking.php, database/seeders/OwnerSeeder.php
+- Tests: tests/Feature/Models/PostgresCompatibilityTest.php (new), tests/Pest.php
+- Docs: PLAN.md, CLAUDE.md, HISTORY.md, CHANGELOG.md, MILESTONES.md, README.md, docs/{database,deployment,architecture}.md
+**DB changes:** two columns json → jsonb (existing migrations edited; nothing deployed yet).
+**Routes:** none
+**How to verify:** create role/databases (README) → set DB_* in .env → `php artisan migrate:fresh --seed`; `vendor/bin/pest` (62 tests incl. PostgresCompatibilityTest, BookingScopesTest "does not treat touching boundaries as overlaps"); `vendor/bin/pint --test`; `vendor/bin/phpstan analyse`. Verified locally on PostgreSQL 18: migrate:fresh --seed, rollback, re-migrate, all green.
+**Key decisions:** D-014 (PostgreSQL), D-006 (tests on PostgreSQL), D-010 (string enums).
+**Edit entry points (where to change things later):**
+- To change DB connection defaults, edit `config/database.php` (`default`, `connections.pgsql`) and `.env.example`.
+- To change the test database, edit `phpunit.xml` (`DB_DATABASE`) and `.github/workflows/ci.yml` (postgres service + Pest env).
+- To change email normalization, edit `app/Models/User.php` (`email()`) and `app/Models/Booking.php` (`guestEmail()`).
+**Known limitations / follow-ups:**
+- Advisory lock + optional exclusion constraint are implemented in M4 (BookingService), not here.
+- jsonb does not keep object key order; compare decoded arrays loosely in tests.
+
 ## M1 Data layer (Done 2026-10-01, commit e1e0b27)
 **Goal:** Full schema, models, enums, factories and seeders per PLAN.md §4, ready for services.
 **Delivered:**
@@ -49,7 +75,7 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 - Docs/env: docs/database.md, .env.example
 **DB changes:** users (+role, +is_active); new packages, add_ons, pricing_rules, bookings, booking_add_ons, payments, blocked_dates, amenities, gallery_images, faqs, settings, activity_logs.
 **Routes:** none
-**How to verify:** set OWNER_EMAIL/OWNER_PASSWORD in .env → `php artisan migrate:fresh --seed`; `vendor/bin/pest` (57 tests: FactoriesTest, BookingScopesTest incl. "does not treat touching boundaries as overlaps", SeederTest, MoneyTest, EnumsTest); `vendor/bin/phpstan analyse`; /design-preview shows enum badges. Verified on MariaDB 10.4: migrate:fresh --seed, full rollback, re-migrate.
+**How to verify:** set OWNER_EMAIL/OWNER_PASSWORD in .env → `php artisan migrate:fresh --seed`; `vendor/bin/pest` (57 tests: FactoriesTest, BookingScopesTest incl. "does not treat touching boundaries as overlaps", SeederTest, MoneyTest, EnumsTest); `vendor/bin/phpstan analyse`; /design-preview shows enum badges. Verified on PostgreSQL 18 (after M0.1): migrate:fresh --seed, full rollback, re-migrate.
 **Key decisions:** D-001 (updated), D-003, D-004 (finalized), D-008 (AA 700 shades), D-009 (local time, half-open windows), D-010 (string enums), D-011 (FK delete rules), D-012 (settings/owner env), D-013 (E.164 phones).
 **Edit entry points (where to change things later):**
 - To change what counts as "occupying" the resort, edit `app/Enums/BookingStatus.php` (`blocking()`).
@@ -59,14 +85,14 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 - To change default packages/settings/FAQs/amenities, edit `database/seeders/{Package,Setting,Faq,Amenity}Seeder.php`.
 - To change sample data, edit `database/factories/Concerns/PhilippineData.php`.
 **Known limitations / follow-ups:**
-- Local XAMPP MariaDB still broken; run `php artisan migrate --seed` on the real DB once fixed.
+- Local DB: resolved by M0.1 (PostgreSQL); schema now verified on PostgreSQL 18.
 - Contact/payment/social settings and Day package hours/pax are placeholders pending owner answers (PLAN.md §14).
 - Transition rules, availability service, pricing and reference-code generator are M4.
 
 ## M0 Setup (Done 2026-10-01, commit 7c42f4f)
 **Goal:** Laravel project, tooling, design tokens and base layouts ready for feature work.
 **Delivered:**
-- Laravel 12 in repo root; MySQL env (db `wonderpool`), APP_NAME, APP_TIMEZONE=Asia/Manila
+- Laravel 12 in repo root; database env (db `wonderpool`; MySQL at M0, PostgreSQL since M0.1), APP_NAME, APP_TIMEZONE=Asia/Manila
 - Tailwind v4 theme: `pool-*` / `garden-*` palettes, Poppins 400–700 (swap), forms plugin; Alpine + focus
 - Layouts `layouts.public` (mobile menu) and `layouts.admin` (desktop sidebar, mobile drawer), shared meta head, flash messages
 - Components: x-ui.button/input/select/textarea/card/badge/modal/alert/flash/empty-state, x-admin.stat-card/page-header
@@ -79,10 +105,10 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 - Routes: routes/web.php
 - Tests: tests/Pest.php, tests/TestCase.php, tests/Feature/SmokeTest.php
 - Docs: README.md, docs/*.md
-**DB changes:** none beyond Laravel defaults (users, cache, jobs); not yet migrated on MySQL.
+**DB changes:** none beyond Laravel defaults (users, cache, jobs); first migrated on PostgreSQL in M0.1.
 **Routes:** GET / (home), GET /design-preview (local only), GET /up
 **How to verify:** `npm run build`; `php artisan serve` → open /design-preview; `vendor/bin/pint --test`; `vendor/bin/phpstan analyse`; `vendor/bin/pest` (SmokeTest: renders home, hides design preview outside local).
-**Key decisions:** D-001 (money = integer centavos), D-002 (Tailwind v4 @theme), D-003/D-004 (provisional palette & badge colors), D-005 (layouts), D-006 (tests on SQLite), D-007 (design preview local only).
+**Key decisions:** D-001 (money = integer centavos), D-002 (Tailwind v4 @theme), D-003/D-004 (provisional palette & badge colors), D-005 (layouts), D-006 (tests; SQLite at M0, PostgreSQL `wonderpool_test` since M0.1), D-007 (design preview local only).
 **Edit entry points (where to change things later):**
 - To change colors/fonts, edit `resources/css/app.css` (`@theme` block).
 - To change status badge colors, edit `resources/views/components/ui/badge.blade.php` (`$statusColors`).
@@ -91,5 +117,5 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 - To change meta tags/SEO defaults, edit `resources/views/partials/head.blade.php`.
 **Known limitations / follow-ups:**
 - PLAN.md was empty during M0 (not committed) → palette/status colors provisional; reconcile.
-- Local MariaDB fails to start (damaged InnoDB data dir); run `php artisan migrate` once fixed.
+- Local MariaDB was unusable; resolved in M0.1 by switching to PostgreSQL.
 - Nav links are placeholders; `/design-preview` must be removed in M9.

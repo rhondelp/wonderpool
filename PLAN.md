@@ -1,6 +1,6 @@
 # Wonderpool Garden Resort: Booking & Management System
 
-**Stack:** Laravel (latest stable) + Blade, MySQL, Tailwind CSS, Blade Icons (Heroicons set), Poppins
+**Stack:** Laravel (latest stable) + Blade, PostgreSQL, Tailwind CSS, Blade Icons (Heroicons set), Poppins
 **Goal:** A public website plus an admin panel where the owner can control almost everything (packages, prices, availability, content, bookings, users) without touching code.
 
 ---
@@ -92,7 +92,9 @@ resources/views/
 
 ---
 
-## 4. Database Design (MySQL)
+## 4. Database Design (PostgreSQL)
+
+> Note: JSON columns are jsonb; enum-backed fields are string columns validated by PHP enums.
 
 ```
 users(id, name, email, password, role, is_active, timestamps)
@@ -143,7 +145,10 @@ A requested window `[S, E)` is **unavailable** if any of these overlap it:
 Since use is exclusive, this one check also handles the cross-package conflicts (e.g. Day on Jun 5 ends 5PM, Night on Jun 5 starts 7PM, which is allowed; 24-Hour on Jun 5 conflicts with both).
 
 ### 5.2 Race-condition safety
-Wrap booking creation in `DB::transaction()` and re-check availability with `lockForUpdate()` on the overlapping rows, so two guests cannot take the same slot.
+Wrap booking creation in `DB::transaction()` and first take a PostgreSQL transaction-level advisory lock (`SELECT pg_advisory_xact_lock(<fixed key>)`), then re-check availability and insert. Locking only the overlapping rows (`lockForUpdate()`) cannot stop two requests that both see no overlap (there is no row to lock), so creation must be serialized; the advisory lock is released automatically on commit/rollback.
+
+Optional second line of defense: a partial exclusion constraint on `bookings` (requires the `btree_gist` extension only if combined with equality columns):
+`EXCLUDE USING gist (tsrange(starts_at, ends_at, '[)') WITH &&) WHERE (status IN ('pending','approved') AND deleted_at IS NULL)`.
 
 ### 5.3 Pending hold expiry
 A `pending` booking without payment proof auto-expires after N hours (setting). A scheduled command (`bookings:expire-stale`) sets it to `cancelled` and frees the slot.
@@ -252,7 +257,7 @@ theme: {
 - Bcrypt passwords, forced owner password change on first login
 - No secrets in git, `APP_DEBUG=false` in production, HTTPS only
 - Track-booking lookup requires **reference code + phone** (prevents guessing)
-- Regular DB backups (nightly `mysqldump` to off-server storage)
+- Regular DB backups (nightly `pg_dump` to off-server storage)
 
 ---
 
@@ -268,7 +273,7 @@ theme: {
 
 | Phase | Deliverables | Est. |
 |---|---|---|
-| **0. Setup** | Laravel install, MySQL, Tailwind/Vite, Poppins, Blade Icons, Pint/Larastan, CI, base layouts, design tokens | 1–2 days |
+| **0. Setup** | Laravel install, PostgreSQL, Tailwind/Vite, Poppins, Blade Icons, Pint/Larastan, CI, base layouts, design tokens | 1–2 days |
 | **1. Data layer** | Migrations, models, enums, factories, seeders | 2 days |
 | **2. Admin foundation** | Auth, roles, admin layout, dashboard shell, Settings + SettingService | 3 days |
 | **3. Content modules** | Packages, add-ons, amenities, gallery, FAQs CRUD | 4 days |
@@ -286,7 +291,7 @@ theme: {
 
 ## 13. Deployment
 
-- PHP 8.2+ (match current Laravel requirement), MySQL 8, Nginx, SSL via Let's Encrypt.
+- PHP 8.2+ (match current Laravel requirement), PostgreSQL 15+, Nginx, SSL via Let's Encrypt.
 - `php artisan optimize`, `npm run build`, queue worker via Supervisor, scheduler via cron (`* * * * * php artisan schedule:run`).
 - `storage:link` for public images; payment proofs stay on the private disk.
 - Zero-downtime deploy script (pull, composer install --no-dev, migrate --force, cache, restart queue).
