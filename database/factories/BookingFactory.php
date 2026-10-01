@@ -19,14 +19,21 @@ class BookingFactory extends Factory
     use PhilippineData;
 
     /**
-     * Pending booking of a Day package on a future date; the window and price follow the package.
+     * Distinct day offset per generated booking, so default bookings never overlap
+     * (the bookings_no_overlap exclusion constraint would reject them, D-021).
+     */
+    private static int $dayOffset = 0;
+
+    /**
+     * Pending Day-hours booking on its own far-future date (400+ days ahead, one day per booking),
+     * clear of the near-term windows tests set explicitly. Use window()/forPackageOn() for specific dates.
      *
      * @return array<string, mixed>
      */
     public function definition(): array
     {
         $name = $this->phName();
-        $date = Carbon::instance(fake()->dateTimeBetween('+3 days', '+6 months'))->startOfDay();
+        $date = now()->startOfDay()->addDays(400 + self::$dayOffset++);
 
         return [
             'reference_code' => fake()->unique()->regexify('WP-[A-HJ-NP-Z2-9]{8}'),

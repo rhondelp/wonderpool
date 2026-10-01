@@ -21,6 +21,10 @@ enum ActivityAction: string
     case ContentUpdated = 'content.updated';
     case ContentDeleted = 'content.deleted';
     case ContentReordered = 'content.reordered';
+    case BookingCreated = 'booking.created';
+    case BookingStatusChanged = 'booking.status_changed';
+    case BookingRescheduled = 'booking.rescheduled';
+    case BookingExpired = 'booking.expired';
 
     /**
      * Human-readable label for the activity log screen.
@@ -41,6 +45,10 @@ enum ActivityAction: string
             self::ContentUpdated => 'Updated content',
             self::ContentDeleted => 'Deleted content',
             self::ContentReordered => 'Reordered content',
+            self::BookingCreated => 'Created booking',
+            self::BookingStatusChanged => 'Changed booking status',
+            self::BookingRescheduled => 'Rescheduled booking',
+            self::BookingExpired => 'Expired unpaid booking',
         };
     }
 }
