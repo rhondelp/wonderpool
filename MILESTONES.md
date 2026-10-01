@@ -8,8 +8,8 @@
 | M2 | 2 | Admin foundation | Done | 2026-10-01 | e2b4c84 |
 | M3 | 3 | Content modules | Done | 2026-10-01 | dd0d451 |
 | M4 | 4 | Booking engine | Done | 2026-10-01 | a8ee111 |
-| M5 | 5 | Public site | In review | 2026-10-01 | d997511 |
-| M6 | 6 | Admin bookings | Not started | | |
+| M5 | 5 | Public site | Done | 2026-10-01 | d997511 |
+| M6 | 6 | Admin bookings | In review | 2026-10-01 | PENDING |
 | M7 | 7 | Reports & logs | Not started | | |
 | M8 | 8 | Notifications | Not started | | |
 | M9 | 9 | Hardening | Not started | | |
@@ -30,6 +30,38 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 -->
 
 # Reports
+
+## M6 Admin bookings & payments (Done 2026-10-01, commit PENDING)
+**Goal:** The owner (and staff) can run the complete booking lifecycle from the admin panel, including walk-ins and receipts.
+**Delivered:**
+- Bookings index: status tabs with counts, filters (status, package, stay dates, payment state), ILIKE search on reference/name/phone/email (any phone format), sortable columns, status + payment badges, pagination
+- Detail page: guest & schedule, price snapshot (package portion, add-ons, override note, total, downpayment, paid, balance), payments with private proof preview (image/PDF modal), full timeline with actor names, internal notes
+- Actions with confirm modals: approve (auto-verifies pending proofs; downpayment must be covered), reject (reason), cancel (optional reason), complete (after the stay), reschedule (admin calendar ignoring itself, live quote, optional reprice); all through BookingService (transition map, log, event)
+- Payments: record (verified immediately), verify, reject with reason (guest sees it), owner-only void; balance and payment state per booking
+- Walk-ins: same engine, source admin, today allowed while the window has not ended, optional payment + immediate approval (one transaction), owner-only price override with mandatory logged reason
+- Receipts: print-friendly page and PDF (DomPDF) with resort info from settings
+- Permission matrix decided (PLAN §14 Q6): staff can do everything on bookings except overrides and voiding verified payments
+**Files created / modified:**
+- DB/domain: database/migrations/2026_10_01_001600_add_admin_fields_to_bookings_and_payments.php, app/Enums/{BookingSource,PaymentState,ActivityAction}.php, app/Models/{Booking,Payment,ActivityLog}.php, app/Exceptions/Booking/{DownpaymentNotCovered,PaymentActionNotAllowed,PriceOverrideNotAllowed}Exception.php
+- Services: app/Services/Booking/{PaymentService,BookingAdminService}.php (new), {BookingService,AvailabilityService,GuestBookingService}.php (extended)
+- HTTP: app/Http/Controllers/Admin/{BookingController,BookingActionController,PaymentController}.php, app/Http/Requests/Admin/Booking/*.php, app/Policies/{BookingPolicy,PaymentPolicy}.php, app/Providers/AppServiceProvider.php, routes/web.php
+- Views/JS: resources/views/admin/bookings/{index,create,show,receipt}.blade.php, resources/views/layouts/print.blade.php, resources/views/partials/{availability-calendar,quote-panel}.blade.php, resources/views/public/book/index.blade.php, resources/views/admin/dashboard.blade.php, resources/views/layouts/admin.blade.php, resources/js/booking.js
+- Tests: tests/Feature/Admin/Bookings/{BookingIndex,BookingActions,Payments,WalkInAndReceipt}Test.php
+- Docs/deps: CHANGELOG.md, HISTORY.md, MILESTONES.md, PLAN.md (§14 Q6 answered), docs/admin-guide.md, composer.json/lock (barryvdh/laravel-dompdf)
+**DB changes:** bookings + source, created_by, original_total_cents, price_override_reason, cancellation_reason; payments + notes, recorded_by, rejection_reason (migrate → rollback → migrate verified).
+**Routes:** admin.bookings.{index,create,store,calendar,quote,show,receipt,approve,reject,cancel,complete,reschedule,notes,payments.store}, admin.payments.{verify,reject,proof}.
+**How to verify:** `php artisan migrate`; sign in as owner → Bookings → Walk-in booking (today, record ₱ downpayment, tick Approve) → detail shows Approved + payment → Receipt / PDF; as a guest book online and upload a proof → as staff open the booking → View proof → Approve; try Reschedule onto a booked date (error); Reject a payment and check the guest tracking page. Automated: `vendor/bin/pest` (467 tests; tests/Feature/Admin/Bookings/*), `vendor/bin/pint --test`, `vendor/bin/phpstan analyse` (no errors), `npm run build`.
+**Key decisions:** D-029 (permission matrix), D-030 (payment & approval rules), D-031 (walk-ins & owner override), D-032 (private proof serving), D-033 (index search/sort, print layout CSS exception).
+**Edit entry points (where to change things later):**
+- **Allowed actions:** status moves in `app/Services/Booking/BookingService.php` → `TRANSITIONS` (+ preconditions in `applyTransition()`); who may do what in `app/Policies/BookingPolicy.php` and `app/Policies/PaymentPolicy.php` (owner-only = `isOwner()`); which buttons appear in `Admin\BookingController@show` (`$can`) and `resources/views/admin/bookings/show.blade.php`.
+- **Receipt layout:** `resources/views/admin/bookings/receipt.blade.php` (content/wording) and `resources/views/layouts/print.blade.php` (styles, paper look); PDF paper size in `Admin\BookingController@receipt` (`setPaper('a5')`); resort details come from Settings → General/Contact.
+- **Payment rules:** what counts as paid / payment states in `app/Services/Booking/PaymentService.php` (`summary()`, mirrored in `Booking::scopePaymentState()`); approval requirement in `app/Services/Booking/BookingAdminService.php` → `approve()`; who may void in `PaymentPolicy::reject()` and `PaymentService::reject()`; recorded-payment fields in `app/Http/Requests/Admin/Booking/RecordPaymentRequest.php`.
+- Walk-in fields/override: `app/Http/Requests/Admin/Booking/StoreWalkInRequest.php`, `resources/views/admin/bookings/create.blade.php`, `BookingService::applyOverride()`.
+- Index filters/sorting: `BookingAdminService::listing()` / `SORTABLE`, `Booking::scopeSearch()`.
+**Known limitations / follow-ups:**
+- Admin modals (reschedule calendar, proof preview) and the print button were not exercised in a real browser (Chrome extension unavailable); endpoints and markup are tested.
+- No refund records on cancellation (handled outside the system).
+- `BookingStatusChanged` listeners (emails) come in M8; reports/activity log screens in M7.
 
 ## M5 Public site & booking flow (Done 2026-10-01, commit d997511)
 **Goal:** Guests can browse the resort, see real availability, book, upload payment proof and track their booking on mobile and desktop.

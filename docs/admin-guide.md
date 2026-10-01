@@ -14,6 +14,14 @@
 ## Dashboard
 - Pending approval, arrivals today, bookings in the next 7 days and (owner only) verified revenue this month, plus the next 5 upcoming bookings.
 ## Managing bookings
+Owners and staff. Only the owner can override a price or void a verified payment.
+- **Bookings** list: tabs per status, search by reference, name or mobile (any format), filter by package, stay dates and payment ("Proof to review", unpaid, partially paid, paid). Click a column title to sort.
+- Open a booking to see the guest, schedule, price, payments and history. **View proof** shows the uploaded receipt (only admins can open it).
+- **Approve**: confirms the guest's uploaded proof automatically; approval needs the downpayment to be paid. If it isn't, use **Record payment** first (cash, GCash, bank).
+- **Reject** needs a reason the guest will see. **Cancel** frees the date (refunds are handled outside the system). **Mark completed** after the stay. **Reschedule** shows a calendar of free dates; tick "Recalculate the price" to use today's rates.
+- **Reject** on a payment (wrong amount, unreadable) tells the guest to upload again.
+- **Walk-in booking** (button on the list): book for someone at the counter or on the phone, even for today; optionally record the payment and approve right away.
+- **Receipt** prints a confirmation; **PDF** downloads it.
 ## Managing rooms, cottages & amenities
 Owner only. Every list has a search box (not case-sensitive) and an Active/Inactive filter. Drag rows by the grip, or use the up/down arrows, to change the order guests see; it saves automatically.
 - **Packages:** name, code, price (₱), start/end time, "Ends the next day" for overnight/24-hour packages, max guests, active. A package with bookings cannot be deleted: untick Active to hide it. Price/time changes only affect new bookings.
