@@ -11,7 +11,7 @@
 |---|---|---|
 | PHP | 8.2 (local XAMPP 8.2.12; CI 8.2) | M0 |
 | Laravel | 12.x (12.69) | M0 |
-| MySQL | MariaDB 10.4 (XAMPP); tests use SQLite :memory: | M0 |
+| PostgreSQL | 15+ (local 18, CI postgres:16); tests use `wonderpool_test` (D-014) | M0.1 |
 | Tailwind CSS | 4.x (Vite plugin) + @tailwindcss/forms 0.5 | M0 |
 | Alpine.js | 3.x + @alpinejs/focus (x-trap) | M0 |
 | blade-heroicons | 2.7 | M0 |
@@ -30,14 +30,15 @@
 | D-003 | 2026-10-01 | Palette = PLAN.md §7: `pool-*` = Tailwind cyan, `garden-*` = Tailwind green (missing 200/400/800/950 shades filled from the same scales). Neutrals = slate; warning = amber; danger = rose. | Reconciled with PLAN.md in M1 (was provisional in M0). | M1 |
 | D-004 | 2026-10-01 | Badge colors come from enum `color()`: BookingStatus pending=amber, approved=garden, rejected=rose, completed=pool, cancelled=slate; PaymentStatus pending=amber, verified=garden, rejected=rose. `x-ui.badge :status` takes the enum. | PLAN.md §7; single source of truth in enums. | M1 |
 | D-005 | 2026-10-01 | Layouts use `@extends`/`@yield` (`layouts.public`, `layouts.admin`) with shared `partials.head`; stacks `styles` and `scripts`; flash via `x-ui.flash` reading session keys success/error/warning/info. | Simple, familiar Blade inheritance; one place for meta tags. | M0 |
-| D-006 | 2026-10-01 | Tests: Pest, in-memory SQLite (phpunit.xml); `Tests\TestCase::setUp` calls `withoutVite()`. | Fast, no MySQL needed in CI or locally. | M0 |
+| D-006 | 2026-10-01 | Tests: Pest on PostgreSQL database `wonderpool_test` (phpunit.xml) with RefreshDatabase; `Tests\TestCase::setUp` calls `withoutVite()`. | Tests exercise the real engine (jsonb, case-sensitive comparisons); was SQLite until M0.1. | M0.1 |
 | D-007 | 2026-10-01 | `/design-preview` route registered only when `APP_ENV=local`. REMOVE IN M9. | Visual QA of theme/components without exposing it in prod. | M0 |
 | D-008 | 2026-10-01 | White text only on `pool-700+` / `garden-700+` (primary button = `bg-pool-700 hover:bg-pool-800`), not PLAN's `pool-600`. | White on pool-600 (#0891b2) is ~3.7:1, fails WCAG AA; pool-700 is ~5.4:1. | M1 |
 | D-009 | 2026-10-01 | Datetimes stored as local Asia/Manila wall-clock (app timezone), no UTC conversion. Booking windows are half-open `[starts_at, ends_at)`; overlap = `starts_at < E AND ends_at > S` (touching ≠ overlap). | Single-location resort; PLAN.md §5.1. | M1 |
-| D-010 | 2026-10-01 | Enums stored as `string(20)` columns (not MySQL ENUM) and cast in models. | Adding a case needs no ALTER TABLE; portable to SQLite tests. | M1 |
+| D-010 | 2026-10-01 | Enums stored as `string(20)` columns (not native DB enum types) and cast in models. | Adding a case needs no ALTER TABLE; values validated by PHP enums. | M1 |
 | D-011 | 2026-10-01 | FK delete rules: package/add-on → `restrict` (keep history), owned children (pricing_rules, booking_add_ons, payments) → `cascade`, actor columns (approved_by, verified_by, created_by, activity_logs.user_id) → `set null`. | History preserved; deleting a user never deletes bookings. | M1 |
 | D-012 | 2026-10-01 | Settings keys are dotted `group.name`; `SettingSeeder` uses firstOrCreate (never overwrites admin edits). Owner credentials come only from `.env` via `config('wonderpool.owner.*')`. | Safe re-seeding; no credentials in git. | M1 |
 | D-013 | 2026-10-01 | Guest phone stored in E.164 (`+639XXXXXXXXX`), indexed for track-booking lookup. | One canonical format for lookups/SMS later. | M1 |
+| D-014 | 2026-10-01 | Database engine is PostgreSQL. Switched from MySQL on 2026-10-01 because MySQL does not run on the dev machine. JSON columns are jsonb (no key-order guarantee); emails stored lowercase via User/Booking mutators; booking creation to be serialized with `pg_advisory_xact_lock` (PLAN.md §5.2). | Local MariaDB unusable; PostgreSQL available locally and in CI. | M0.1 |
 
 ## Folder Map
 | Path | Purpose | Milestone |
@@ -64,7 +65,7 @@
 | `resources/views/design-preview.blade.php` | Component gallery, local only (remove M9) | M0 |
 | `routes/web.php` | Web routes | M0 |
 | `tests/Feature/SmokeTest.php` | Boot/home/design-preview guard tests | M0 |
-| `tests/Feature/Models/` | FactoriesTest, BookingScopesTest (overlap edge cases) | M1 |
+| `tests/Feature/Models/` | FactoriesTest, BookingScopesTest (overlap edge cases), PostgresCompatibilityTest (lowercase emails, jsonb) | M1/M0.1 |
 | `tests/Feature/SeederTest.php` | Seed data, idempotency, owner env guard | M1 |
 | `tests/Unit/` | MoneyTest, EnumsTest | M1 |
 
@@ -97,12 +98,12 @@ Full dictionary + ERD: `docs/database.md`.
 ## Models & Relationships
 | Model | Relationships | Scopes / helpers | Milestone |
 |---|---|---|---|
-| User | approvedBookings (hasMany Booking), activityLogs | active(); isOwner(); casts role→UserRole | M1 |
+| User | approvedBookings (hasMany Booking), activityLogs | active(); isOwner(); casts role→UserRole; email mutator lowercases (D-014) | M1 |
 | Package | bookings, pricingRules | active(), ordered(); formatted_price | M1 |
 | AddOn | bookings (belongsToMany via BookingAddOn) | active(); formatted_price | M1 |
 | BookingAddOn (Pivot) | booking, addOn | line_total_cents, formattedLineTotal() | M1 |
 | PricingRule | package | active(), forPackage($id) | M1 |
-| Booking | package, approver (User), addOns (pivot quantity/unit_price_cents), payments | active() (pending+approved), overlapping($s,$e), status($enum); formatted_total, formatted_downpayment; SoftDeletes | M1 |
+| Booking | package, approver (User), addOns (pivot quantity/unit_price_cents), payments | active() (pending+approved), overlapping($s,$e), status($enum); formatted_total, formatted_downpayment; guest_email mutator lowercases (D-014); SoftDeletes | M1 |
 | Payment | booking, verifier (User) | verified(); formatted_amount | M1 |
 | BlockedDate | creator (User) | overlapping($s,$e) | M1 |
 | Amenity | — | active(), ordered() | M1 |
@@ -174,7 +175,7 @@ Full dictionary + ERD: `docs/database.md`.
 | APP_DEBUG | false in production | M0 |
 | APP_URL | Base URL (default http://localhost:8000) | M0 |
 | APP_TIMEZONE | App timezone, read by config/app.php (Asia/Manila) | M0 |
-| DB_CONNECTION/HOST/PORT/DATABASE/USERNAME/PASSWORD | MySQL connection (db `wonderpool`) | M0 |
+| DB_CONNECTION/HOST/PORT/DATABASE/USERNAME/PASSWORD | PostgreSQL connection: `pgsql`, 127.0.0.1:5432, db `wonderpool`, user `wonderpool_user` (tests: db `wonderpool_test`) | M0.1 |
 | SESSION_DRIVER, CACHE_STORE, QUEUE_CONNECTION | `database` (needs migrations) | M0 |
 | MAIL_* | Mailer; `log` in dev | M0 |
 | OWNER_NAME | Initial owner display name (OwnerSeeder) | M1 |
@@ -192,7 +193,7 @@ Full dictionary + ERD: `docs/database.md`.
 - Unavailable if any `Booking::active()->overlapping(S, E)` or `BlockedDate::overlapping(S, E)` (M1 scopes; half-open, D-009). Service + locking in M4.
 
 ## Known Issues / TODO
-- Local XAMPP MariaDB fails to start (InnoDB "log sequence number is in the future", damaged data dir). M1 schema verified on a throwaway MariaDB 10.4 (migrate:fresh --seed, full rollback, re-migrate); run `php artisan migrate --seed` on the real DB once fixed. (M0/M1)
+- Resolved in M0.1: local MariaDB was unusable, so the project moved to PostgreSQL (D-014); schema verified with migrate:fresh --seed, rollback and re-migrate on PostgreSQL 18. (M0/M1/M0.1)
 - Settings contact/payment/social values are placeholders; replace once the owner answers PLAN.md §14 Q5. (M1)
 - Day package hours (7AM–5PM) and Day max pax (50) are proposed defaults pending owner confirmation (PLAN.md §1). (M1)
 - Admin/public nav links are `#` placeholders until routes exist (M2/M5). (M0)

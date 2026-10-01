@@ -15,6 +15,22 @@ ENTRY TEMPLATE
 
 ## Unreleased
 
+## [M0.1] Switch database engine to PostgreSQL - 2026-10-01
+### Changed
+- Default DB connection is `pgsql`; `.env.example` uses PostgreSQL placeholders (127.0.0.1:5432, db wonderpool, user wonderpool_user) (files: config/database.php, .env.example)
+- Tests run on PostgreSQL database `wonderpool_test` instead of in-memory SQLite (files: phpunit.xml, tests/Pest.php)
+- CI: `postgres:16` service with pg_isready health check, pdo_pgsql/pgsql extensions, DB_* env for Pest (files: .github/workflows/ci.yml)
+- `json` columns → `jsonb` (files: database/migrations/2026_10_01_000400_create_pricing_rules_table.php, database/migrations/2026_10_01_001300_create_activity_logs_table.php)
+- Emails stored trimmed + lowercase via mutators; OwnerSeeder normalizes the lookup email (files: app/Models/User.php, app/Models/Booking.php, database/seeders/OwnerSeeder.php)
+- Docs: MySQL → PostgreSQL, §5.2 advisory-lock strategy + optional exclusion constraint, pg_dump backups, PostgreSQL 15+; database rules for agents; install steps with role/database SQL; D-014 (files: PLAN.md, CLAUDE.md, HISTORY.md, MILESTONES.md, README.md, docs/database.md, docs/deployment.md, docs/architecture.md)
+- Ignore `*.dump` and `*.backup` (files: .gitignore)
+### Added
+- PostgreSQL compatibility tests: lowercase emails, owner seeder normalization, jsonb round-trip and column types (files: tests/Feature/Models/PostgresCompatibilityTest.php)
+### DB: edited (not new) migrations create_pricing_rules_table and create_activity_logs_table (json → jsonb); run `php artisan migrate:fresh --seed`
+### Routes: none
+### Breaking / Notes
+- Requires PostgreSQL 15+ and PHP pdo_pgsql/pgsql. Local `.env` must switch DB_CONNECTION/DB_PORT/DB_USERNAME/DB_PASSWORD; tests need database `wonderpool_test`.
+
 ## [M1] Data layer - 2026-10-01
 ### Added
 - Enums with label()/color(): BookingStatus, PaymentStatus, PaymentType, UserRole, PricingRuleType, PricingAdjustmentType, GalleryCategory (files: app/Enums/*.php)
