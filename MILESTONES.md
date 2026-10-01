@@ -8,7 +8,7 @@
 | M2 | 2 | Admin foundation | Done | 2026-10-01 | e2b4c84 |
 | M3 | 3 | Content modules | Done | 2026-10-01 | dd0d451 |
 | M4 | 4 | Booking engine | Done | 2026-10-01 | a8ee111 |
-| M5 | 5 | Public site | In review | 2026-10-01 | PENDING |
+| M5 | 5 | Public site | In review | 2026-10-01 | d997511 |
 | M6 | 6 | Admin bookings | Not started | | |
 | M7 | 7 | Reports & logs | Not started | | |
 | M8 | 8 | Notifications | Not started | | |
@@ -31,7 +31,7 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 
 # Reports
 
-## M5 Public site & booking flow (Done 2026-10-01, commit PENDING)
+## M5 Public site & booking flow (Done 2026-10-01, commit d997511)
 **Goal:** Guests can browse the resort, see real availability, book, upload payment proof and track their booking on mobile and desktop.
 **Delivered:**
 - Public pages: home (hero, highlights, about, amenities, packages, gallery strip, map, CTA), amenities, packages & rates (+ add-ons), gallery (category filter + accessible lightbox), FAQ, contact, policies; all content from DB/settings (new "Website content" and "SEO" settings), empty sections hidden
