@@ -25,8 +25,9 @@
 
 @php
     $id = $id ?? $name;
-    $error = $errors->first($name);
-    $current = (string) old($name, $selected);
+    $key = str_replace(['[', ']'], ['.', ''], $name); // "a[b]" → "a.b" for old() and $errors
+    $error = $errors->first($key);
+    $current = (string) old($key, $selected);
 @endphp
 
 <div>

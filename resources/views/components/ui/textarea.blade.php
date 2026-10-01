@@ -23,7 +23,8 @@
 
 @php
     $id = $id ?? $name;
-    $error = $errors->first($name);
+    $key = str_replace(['[', ']'], ['.', ''], $name); // "a[b]" → "a.b" for old() and $errors
+    $error = $errors->first($key);
 @endphp
 
 <div>
@@ -44,7 +45,7 @@
             'block w-full rounded-lg border-slate-300 text-sm shadow-sm focus:border-pool-500 focus:ring-pool-500',
             'border-rose-500 focus:border-rose-500 focus:ring-rose-500' => $error,
         ]) }}
-    >{{ old($name, $value) }}</textarea>
+    >{{ old($key, $value) }}</textarea>
 
     @if ($error)
         <p id="{{ $id }}-error" class="mt-1 text-sm text-rose-700">{{ $error }}</p>

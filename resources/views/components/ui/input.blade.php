@@ -1,7 +1,7 @@
 {{--
     x-ui.input — Labelled text input with validation error and hint; repopulates from old().
 
-    @prop string      $name      Field name (required); also used for old() and $errors lookup
+    @prop string      $name      Field name (required), may use brackets ("group[key]"); used for old() and $errors lookup
     @prop string|null $label     Visible label (optional)
     @prop string      $type      Input type (default: text)
     @prop string|null $id        Element id (default: $name)
@@ -23,7 +23,8 @@
 
 @php
     $id = $id ?? $name;
-    $error = $errors->first($name);
+    $key = str_replace(['[', ']'], ['.', ''], $name); // "a[b]" → "a.b" for old() and $errors
+    $error = $errors->first($key);
 @endphp
 
 <div>
@@ -38,7 +39,7 @@
         type="{{ $type }}"
         name="{{ $name }}"
         id="{{ $id }}"
-        @if ($type !== 'password') value="{{ old($name, $value) }}" @endif
+        @if ($type !== 'password') value="{{ old($key, $value) }}" @endif
         @required($required)
         @if ($error) aria-invalid="true" aria-describedby="{{ $id }}-error" @elseif ($hint) aria-describedby="{{ $id }}-hint" @endif
         {{ $attributes->class([

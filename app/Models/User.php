@@ -22,6 +22,8 @@ use Illuminate\Support\Carbon;
  * @property string $password
  * @property UserRole $role
  * @property bool $is_active
+ * @property bool $must_change_password
+ * @property Carbon|null $last_login_at
  * @property string|null $remember_token
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
@@ -41,6 +43,7 @@ class User extends Authenticatable
         'password',
         'role',
         'is_active',
+        'must_change_password',
     ];
 
     /**
@@ -61,6 +64,8 @@ class User extends Authenticatable
             'password' => 'hashed',
             'role' => UserRole::class,
             'is_active' => 'boolean',
+            'must_change_password' => 'boolean',
+            'last_login_at' => 'datetime',
         ];
     }
 
