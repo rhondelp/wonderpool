@@ -3,18 +3,16 @@
 
     Sections: title, content
     Stacks:   styles (in <head>), scripts (end of <body>)
-    Nav items are placeholders ('#') until their modules/routes exist (M2+); edit $nav below.
+    Nav: add a module by appending to $nav below (route = link target, active = routeIs pattern,
+    can = gate/ability required, or null for every admin). Only built modules are listed.
 --}}
 @php
     $nav = [
-        ['label' => 'Dashboard', 'icon' => 'home', 'href' => '#'],
-        ['label' => 'Bookings', 'icon' => 'calendar-days', 'href' => '#'],
-        ['label' => 'Rooms & Cottages', 'icon' => 'building-office-2', 'href' => '#'],
-        ['label' => 'Amenities', 'icon' => 'sparkles', 'href' => '#'],
-        ['label' => 'Reports', 'icon' => 'chart-bar', 'href' => '#'],
-        ['label' => 'Activity Logs', 'icon' => 'clipboard-document-list', 'href' => '#'],
-        ['label' => 'Settings', 'icon' => 'cog-6-tooth', 'href' => '#'],
+        ['label' => 'Dashboard', 'icon' => 'home', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'can' => null],
+        ['label' => 'Users', 'icon' => 'users', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'can' => 'manage-users'],
+        ['label' => 'Settings', 'icon' => 'cog-6-tooth', 'route' => 'admin.settings.index', 'active' => 'admin.settings.*', 'can' => 'manage-settings'],
     ];
+    $nav = array_values(array_filter($nav, fn (array $item): bool => $item['can'] === null || (auth()->user()?->can($item['can']) ?? false)));
 @endphp
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}" class="h-full">
@@ -53,9 +51,27 @@
                 <x-heroicon-o-bars-3 class="h-6 w-6" aria-hidden="true" />
             </button>
             <p class="truncate text-sm font-medium text-slate-500">@yield('title', 'Admin')</p>
-            <div class="ml-auto flex items-center gap-3 text-sm text-slate-600">
-                <x-heroicon-o-user-circle class="h-7 w-7 text-pool-600" aria-hidden="true" />
-                <span class="hidden sm:inline">{{ auth()->user()->name ?? 'Administrator' }}</span>
+            <div class="relative ml-auto" x-data="{ open: false }" x-on:click.outside="open = false" x-on:keydown.escape="open = false">
+                <button type="button" x-on:click="open = !open" x-bind:aria-expanded="open" aria-haspopup="true" aria-controls="user-menu" class="flex items-center gap-2 rounded-lg p-1.5 text-sm text-slate-700 hover:bg-slate-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-pool-500">
+                    <x-heroicon-o-user-circle class="h-7 w-7 text-pool-700" aria-hidden="true" />
+                    <span class="hidden sm:inline">{{ auth()->user()?->name }}</span>
+                    <x-heroicon-m-chevron-down class="h-4 w-4 text-slate-500" aria-hidden="true" />
+                </button>
+                <div id="user-menu" x-show="open" x-cloak x-transition class="absolute right-0 mt-2 w-56 overflow-hidden rounded-lg bg-white py-1 shadow-lg ring-1 ring-slate-200">
+                    <div class="border-b border-slate-100 px-4 py-2">
+                        <p class="truncate text-sm font-medium text-slate-900">{{ auth()->user()?->name }}</p>
+                        <p class="truncate text-xs text-slate-500">{{ auth()->user()?->role->label() }}</p>
+                    </div>
+                    <a href="{{ route('admin.password.edit') }}" class="flex items-center gap-2 px-4 py-2 text-sm text-slate-700 hover:bg-pool-50">
+                        <x-heroicon-o-key class="h-4 w-4" aria-hidden="true" /> Change password
+                    </a>
+                    <form method="POST" action="{{ route('admin.logout') }}">
+                        @csrf
+                        <button type="submit" class="flex w-full items-center gap-2 px-4 py-2 text-left text-sm text-slate-700 hover:bg-pool-50">
+                            <x-heroicon-o-arrow-right-start-on-rectangle class="h-4 w-4" aria-hidden="true" /> Sign out
+                        </button>
+                    </form>
+                </div>
             </div>
         </header>
 

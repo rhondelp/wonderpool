@@ -58,6 +58,14 @@ class UserFactory extends Factory
     }
 
     /**
+     * Must set a new password before using the admin panel.
+     */
+    public function mustChangePassword(): static
+    {
+        return $this->state(fn () => ['must_change_password' => true]);
+    }
+
+    /**
      * Indicate that the model's email address should be unverified.
      */
     public function unverified(): static
