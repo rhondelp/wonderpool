@@ -3,7 +3,7 @@
 | ID | Phase | Title | Status | Date done | Commit hash |
 |---|---|---|---|---|---|
 | M0 | 0 | Setup | Done | 2026-10-01 | 7c42f4f |
-| M0.1 | 0 | Switch database to PostgreSQL (change) | In review | 2026-10-01 | |
+| M0.1 | 0 | Switch database to PostgreSQL (change) | In review | 2026-10-01 | 6209193 |
 | M1 | 1 | Data layer | Done | 2026-10-01 | e1e0b27 |
 | M2 | 2 | Admin foundation | Not started | | |
 | M3 | 3 | Content modules | Not started | | |
@@ -31,7 +31,7 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 
 # Reports
 
-## M0.1 Switch database to PostgreSQL (Done 2026-10-01, commit TBD)
+## M0.1 Switch database to PostgreSQL (Done 2026-10-01, commit 6209193)
 **Goal:** Replace MySQL with PostgreSQL (MySQL does not run on the dev machine). Infrastructure only: no business rules, features or UI change.
 **Delivered:**
 - PostgreSQL as default connection (`pgsql`), `.env.example` placeholders, tests on `wonderpool_test`, CI with a `postgres:16` service
