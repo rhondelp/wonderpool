@@ -51,21 +51,27 @@ class GuestBookingService
      * Day states for one month of a package's calendar.
      * "available" = window free and bookable now; "booked" = overlaps a booking or block;
      * "closed" = outside the lead time / max advance window (incl. past days).
+     * Admin mode (M6): $enforceBookingWindow = false only closes days whose window already ended
+     * (a walk-in may arrive after the start),
+     * and $ignoreBookingId leaves the booking being rescheduled out of the overlap check.
      *
      * @param  CarbonInterface  $month  Any day in the month
+     * @param  int|null  $ignoreBookingId  Booking being rescheduled
+     * @param  bool  $enforceBookingWindow  Apply lead time / max advance (guests)
      * @return array{month: string, label: string, days: array<string, string>, has_previous: bool, has_next: bool}
      */
-    public function calendar(Package $package, CarbonInterface $month): array
+    public function calendar(Package $package, CarbonInterface $month, ?int $ignoreBookingId = null, bool $enforceBookingWindow = true): array
     {
         $first = CarbonImmutable::parse($month->format('Y-m-01'), config('app.timezone'));
         $last = $first->endOfMonth()->startOfDay();
-        $map = $this->availability->unavailableDates($first, $last, $package);
+        $map = $this->availability->unavailableDates($first, $last, $package, $ignoreBookingId);
         $days = [];
 
         foreach ($map as $date => $state) {
             $window = $this->availability->resolveWindow($package, CarbonImmutable::parse($date, config('app.timezone')));
             $days[$date] = match (true) {
-                ! $this->availability->isWithinBookingWindow($window['starts_at']) => 'closed',
+                $enforceBookingWindow && ! $this->availability->isWithinBookingWindow($window['starts_at']) => 'closed',
+                ! $enforceBookingWindow && $window['ends_at']->isPast() => 'closed',
                 ! $state['available'] => 'booked',
                 default => 'available',
             };
@@ -79,7 +85,7 @@ class GuestBookingService
             'label' => $first->format('F Y'),
             'days' => $days,
             'has_previous' => $first->greaterThan($today),
-            'has_next' => $first->lessThan($limit),
+            'has_next' => ! $enforceBookingWindow || $first->lessThan($limit),
         ];
     }
 
@@ -87,10 +93,14 @@ class GuestBookingService
      * Live quote for the booking form: availability of the window plus the price breakdown.
      * Rule violations are returned as a friendly reason instead of thrown.
      *
+     * Admin mode (M6): ignore the booking being rescheduled and skip the lead time / max advance rule.
+     *
      * @param  array<int|string, int|string>  $addOns  [add_on_id => quantity]
+     * @param  int|null  $ignoreBookingId  Booking being rescheduled
+     * @param  bool  $enforceBookingWindow  Apply lead time / max advance (guests)
      * @return array{available: bool, reason: ?string, window: ?array{starts_at: string, ends_at: string, label: string}, breakdown: ?array<string, mixed>}
      */
-    public function quote(Package $package, CarbonInterface $date, int $guestCount, array $addOns = []): array
+    public function quote(Package $package, CarbonInterface $date, int $guestCount, array $addOns = [], ?int $ignoreBookingId = null, bool $enforceBookingWindow = true): array
     {
         $window = $this->availability->resolveWindow($package, $date);
         $windowInfo = [
@@ -107,8 +117,9 @@ class GuestBookingService
 
         $reason = match (true) {
             ! $package->is_active => 'This package is not available for booking.',
-            ! $this->availability->isWithinBookingWindow($window['starts_at']) => $this->bookingWindowMessage(),
-            ! $this->availability->isAvailable($window['starts_at'], $window['ends_at']) => 'Sorry, the resort is already booked or closed at that time. Please pick another date or package.',
+            $enforceBookingWindow && ! $this->availability->isWithinBookingWindow($window['starts_at']) => $this->bookingWindowMessage(),
+            ! $enforceBookingWindow && $window['ends_at']->isPast() => 'That time has already ended.',
+            ! $this->availability->isAvailable($window['starts_at'], $window['ends_at'], $ignoreBookingId) => 'Sorry, the resort is already booked or closed at that time. Please pick another date or package.',
             default => null,
         };
 
@@ -193,6 +204,8 @@ class GuestBookingService
             $item = match ($entry->action) {
                 ActivityAction::BookingCreated->value => ['label' => 'Booking request received', 'note' => null, 'tone' => 'pool'],
                 ActivityAction::PaymentProofUploaded->value => ['label' => 'Payment proof received', 'note' => ($props['replaced'] ?? false) ? 'Replaced the previous proof.' : null, 'tone' => 'pool'],
+                ActivityAction::PaymentVerified->value, ActivityAction::PaymentRecorded->value => ['label' => 'Payment confirmed', 'note' => null, 'tone' => 'garden'],
+                ActivityAction::PaymentRejected->value => ['label' => 'Payment proof not accepted', 'note' => is_string($props['reason'] ?? null) ? $props['reason'] : null, 'tone' => 'rose'],
                 ActivityAction::BookingRescheduled->value => ['label' => 'Booking moved', 'note' => isset($props['to']['starts_at']) ? 'New start: '.Carbon::parse($props['to']['starts_at'])->format('M j, Y g:i A') : null, 'tone' => 'amber'],
                 ActivityAction::BookingStatusChanged->value, ActivityAction::BookingExpired->value => $this->statusEntry((string) ($props['to'] ?? ''), $props['reason'] ?? null),
                 default => null,
