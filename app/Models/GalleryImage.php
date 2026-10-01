@@ -4,6 +4,9 @@ namespace App\Models;
 
 use App\Enums\GalleryCategory;
 use Database\Factories\GalleryImageFactory;
+use App\Enums\ImageVariant;
+use App\Models\Concerns\AdminListable;
+use App\Services\Content\ImageService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,6 +26,8 @@ use Illuminate\Support\Carbon;
  */
 class GalleryImage extends Model
 {
+    use AdminListable;
+
     /** @use HasFactory<GalleryImageFactory> */
     use HasFactory;
 
@@ -47,6 +52,41 @@ class GalleryImage extends Model
             'is_visible' => 'boolean',
             'sort_order' => 'integer',
         ];
+    }
+
+
+    /**
+     * Columns matched by the admin search box (ILIKE).
+     *
+     * @return list<string>
+     */
+    public static function adminSearchColumns(): array
+    {
+        return ['caption'];
+    }
+
+    /**
+     * The visibility flag drives the visible/hidden filter.
+     */
+    public static function adminStateColumn(): string
+    {
+        return 'is_visible';
+    }
+
+    /**
+     * Caption, or "Image #id" when there is none.
+     */
+    public function adminLabel(): string
+    {
+        return $this->caption !== null && $this->caption !== '' ? $this->caption : 'Image #'.$this->id;
+    }
+
+    /**
+     * Public URL of a resized version of the image (null when there is none).
+     */
+    public function imageUrl(ImageVariant $variant = ImageVariant::Large): ?string
+    {
+        return ImageService::url($this->path, $variant);
     }
 
     /**

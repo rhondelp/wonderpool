@@ -3,6 +3,9 @@
 namespace App\Models;
 
 use Database\Factories\AmenityFactory;
+use App\Enums\ImageVariant;
+use App\Models\Concerns\AdminListable;
+use App\Services\Content\ImageService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -23,6 +26,8 @@ use Illuminate\Support\Carbon;
  */
 class Amenity extends Model
 {
+    use AdminListable;
+
     /** @use HasFactory<AmenityFactory> */
     use HasFactory;
 
@@ -47,6 +52,25 @@ class Amenity extends Model
             'is_active' => 'boolean',
             'sort_order' => 'integer',
         ];
+    }
+
+
+    /**
+     * Columns matched by the admin search box (ILIKE).
+     *
+     * @return list<string>
+     */
+    public static function adminSearchColumns(): array
+    {
+        return ['name', 'description'];
+    }
+
+    /**
+     * Public URL of a resized version of the image (null when there is none).
+     */
+    public function imageUrl(ImageVariant $variant = ImageVariant::Large): ?string
+    {
+        return ImageService::url($this->image_path, $variant);
     }
 
     /**

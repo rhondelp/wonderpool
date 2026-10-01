@@ -15,6 +15,12 @@
 - Pending approval, arrivals today, bookings in the next 7 days and (owner only) verified revenue this month, plus the next 5 upcoming bookings.
 ## Managing bookings
 ## Managing rooms, cottages & amenities
+Owner only. Every list has a search box (not case-sensitive) and an Active/Inactive filter. Drag rows by the grip, or use the up/down arrows, to change the order guests see; it saves automatically.
+- **Packages:** name, code, price (₱), start/end time, "Ends the next day" for overnight/24-hour packages, max guests, active. A package with bookings cannot be deleted: untick Active to hide it. Price/time changes only affect new bookings.
+- **Add-ons:** name, description, price, active. Add-ons used on bookings cannot be deleted; deactivate them instead.
+- **Amenities:** name, description, icon (type to search the icon list), optional photo, active.
+- **Gallery:** Upload images → pick up to 20 JPG/PNG/WebP files (5 MB each), a category and an optional caption. Use Hide/Show to control what guests see, Edit to change caption or category.
+- **FAQs:** question, answer, active.
 ## Reports & activity logs
 ## Settings
 - Owner only. Tabs: General, Booking rules (downpayment %, pending hold, lead time, max advance days), Payment instructions, Contact, Social links. Every change is recorded in the activity log.

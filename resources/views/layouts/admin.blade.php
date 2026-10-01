@@ -9,6 +9,11 @@
 @php
     $nav = [
         ['label' => 'Dashboard', 'icon' => 'home', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'can' => null],
+        ['label' => 'Packages', 'icon' => 'cube', 'route' => 'admin.packages.index', 'active' => 'admin.packages.*', 'can' => 'manage-content'],
+        ['label' => 'Add-ons', 'icon' => 'tag', 'route' => 'admin.add-ons.index', 'active' => 'admin.add-ons.*', 'can' => 'manage-content'],
+        ['label' => 'Amenities', 'icon' => 'sparkles', 'route' => 'admin.amenities.index', 'active' => 'admin.amenities.*', 'can' => 'manage-content'],
+        ['label' => 'Gallery', 'icon' => 'photo', 'route' => 'admin.gallery.index', 'active' => 'admin.gallery.*', 'can' => 'manage-content'],
+        ['label' => 'FAQs', 'icon' => 'question-mark-circle', 'route' => 'admin.faqs.index', 'active' => 'admin.faqs.*', 'can' => 'manage-content'],
         ['label' => 'Users', 'icon' => 'users', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'can' => 'manage-users'],
         ['label' => 'Settings', 'icon' => 'cog-6-tooth', 'route' => 'admin.settings.index', 'active' => 'admin.settings.*', 'can' => 'manage-settings'],
     ];

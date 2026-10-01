@@ -17,6 +17,10 @@ enum ActivityAction: string
     case UserDeactivated = 'user.deactivated';
     case UserPasswordReset = 'user.password_reset';
     case SettingsUpdated = 'settings.updated';
+    case ContentCreated = 'content.created';
+    case ContentUpdated = 'content.updated';
+    case ContentDeleted = 'content.deleted';
+    case ContentReordered = 'content.reordered';
 
     /**
      * Human-readable label for the activity log screen.
@@ -33,6 +37,10 @@ enum ActivityAction: string
             self::UserDeactivated => 'Disabled user',
             self::UserPasswordReset => 'Reset user password',
             self::SettingsUpdated => 'Updated settings',
+            self::ContentCreated => 'Created content',
+            self::ContentUpdated => 'Updated content',
+            self::ContentDeleted => 'Deleted content',
+            self::ContentReordered => 'Reordered content',
         };
     }
 }

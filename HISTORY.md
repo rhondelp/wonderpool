@@ -18,6 +18,7 @@
 | Font | Poppins 400/500/600/700 via @fontsource/poppins 5 (font-display: swap) | M0 |
 | Pest | 3.x + pest-plugin-laravel | M0 |
 | Larastan | 3.x, level 6 | M0 |
+| intervention/image | 3.11 (GD driver; PHP `gd` with WebP required, CI enables it) | M3 |
 | Pint | 1.x, preset psr12 | M0 |
 | Vite | 7.x (laravel-vite-plugin 2) | M0 |
 
@@ -41,6 +42,9 @@
 | D-015 | 2026-10-01 | Admin-only accounts at `/admin/*` (guests never log in). Forgotten passwords are reset by an owner with a temporary password (`must_change_password` forces a change); no email reset flow until mail exists (M8). Owner seeded from .env must change that password on first login. Login throttled 5 attempts/min per email+IP. | PLAN.md §10 (forced owner password change, rate-limited login); mail not configured yet. | M2 |
 | D-016 | 2026-10-01 | Roles enforced twice: route groups use `role:owner` middleware; views/requests use gates `manage-settings`, `manage-users`, `view-financials` and `UserPolicy`. Nobody can disable, reset or change the role of themselves (keeps ≥1 active owner). Admin nav lists only built modules, filtered by gate. | Staff = bookings only (PLAN.md §2.2); defense in depth. | M2 |
 | D-017 | 2026-10-01 | Settings registry = `SettingGroup::fields()` (label, input type, default, validation rules per key). `SettingService` caches all rows under `settings.all` forever, flushes on write, falls back to declared defaults; SettingSeeder seeds from the registry. Empty optional values stored as `""`. Settings forms post nested inputs `group[name]`. | One source of truth for keys, defaults and validation. | M2 |
+| D-018 | 2026-10-01 | Content images live on the `public` disk (`storage/app/public`, served at `/storage` after `php artisan storage:link`): original at `{dir}/originals/{uuid}.{ext}`, WebP `{dir}/large/{uuid}.webp` (≤1600 px) and `{dir}/thumbs/{uuid}.webp` (≤480 px); dir = `gallery` or `amenities`. DB stores only the original's path; variant paths derived by `ImageService::variantPath()`. Uploads: jpg/png/webp, ≤5 MB, ≤8000 px/side; gallery ≤20 files per upload. Files deleted with the record or on replacement. Payment proofs are NOT here (private disk, M5). | Fast pages (thumbs/WebP) while keeping originals; unguessable UUID names. | M3 |
+| D-019 | 2026-10-01 | Content modules share `ContentService` (create/update/delete/reorder) and log `content.created/updated/deleted/reordered` with `{type, label}` (+ changed field names on update). Deletion guarded by `GuardsDeletion`: packages with any booking (incl. soft-deleted) and add-ons on any booking cannot be deleted → warning flash suggesting deactivation. | Bookings reference packages/add-ons with restrict FKs (D-011); one audit format. | M3 |
+| D-020 | 2026-10-01 | Display order: `sort_order` renumbered 1..n on every reorder. Reorder endpoints receive the visible ids (page/filter subset); those records swap among the slots they already hold in the full order. New records go last (max+1); blank sort_order on update keeps the current value. Admin search uses ILIKE with `%`/`_` escaped; filter `status=active|inactive` maps to `is_active` (gallery: `is_visible`). | Works with pagination and filters; repairs duplicate orders. | M3 |
 | D-014 | 2026-10-01 | Database engine is PostgreSQL. Switched from MySQL on 2026-10-01 because MySQL does not run on the dev machine. JSON columns are jsonb (no key-order guarantee); emails stored lowercase via User/Booking mutators; booking creation to be serialized with `pg_advisory_xact_lock` (PLAN.md §5.2). | Local MariaDB unusable; PostgreSQL available locally and in CI. | M0.1 |
 
 ## Folder Map
@@ -50,12 +54,17 @@
 | `.github/workflows/ci.yml` | CI: Pint, Larastan, npm build, Pest | M0 |
 | `app/` | Laravel app code | M0 |
 | `app/Enums/` | String-backed enums with label()/color() | M1 |
-| `app/Http/Controllers/Admin/` | Admin controllers; `Auth/` = Login, Password | M2 |
+| `app/Exceptions/ContentInUseException.php` | Delete refused (message shown to admins) | M3 |
+| `app/Http/Controllers/Admin/` | Admin controllers; `Auth/` = Login, Password; content: Package, AddOn, Amenity, Gallery, Faq (M3) | M2/M3 |
 | `app/Http/Middleware/` | EnsureUserIsActive (`active`), EnsurePasswordIsChanged (`password.changed`), EnsureUserHasRole (`role`); aliases in bootstrap/app.php | M2 |
 | `app/Http/Requests/Admin/` | Admin Form Requests (login, passwords, users, settings) | M2 |
-| `app/Policies/` | UserPolicy | M2 |
-| `app/Providers/AppServiceProvider.php` | Service singletons + gates (manage-settings, manage-users, view-financials) | M2 |
-| `app/Services/` | Business logic (see Services Index) | M2 |
+| `app/Http/Requests/Admin/Content/` | `{Module}Request` base (rules + payload()) with Store/Update subclasses; StoreGalleryImagesRequest, UpdateGalleryImageRequest, ReorderRequest, ImageRules | M3 |
+| `app/Policies/` | UserPolicy; ContentPolicy base + Package/AddOn/Amenity/GalleryImage/Faq policies (owner only) | M2/M3 |
+| `app/Providers/AppServiceProvider.php` | Service singletons (+ ImageManager GD) + gates (manage-settings, manage-users, manage-content, view-financials) | M2/M3 |
+| `app/Services/` | Business logic (see Services Index); `Content/` = content modules + images | M2/M3 |
+| `app/Models/Concerns/AdminListable.php` | search() ILIKE, whereState(), adminLabel(), adminSearchColumns() | M3 |
+| `app/Models/Contracts/GuardsDeletion.php` | deletionBlockedReason() | M3 |
+| `app/Support/AmenityIcons.php` | Curated heroicons for the amenity picker | M3 |
 | `app/Models/` | Eloquent models (see Models & Relationships) | M1 |
 | `app/Support/Money.php` | Centavo convert/format helpers (D-001) | M1 |
 | `config/app.php` | timezone = env APP_TIMEZONE (Asia/Manila) | M0 |
@@ -65,9 +74,11 @@
 | `database/seeders/` | DatabaseSeeder → Owner, Package, Amenity, Setting, Faq seeders | M1 |
 | `docs/` | architecture, database (ERD + dictionary, M1), booking-flow, admin-guide, deployment | M0 |
 | `resources/css/app.css` | Tailwind v4 entry + `@theme` tokens + Poppins imports (D-002) | M0 |
-| `resources/js/app.js` | Alpine + focus plugin bootstrap | M0 |
+| `resources/js/app.js` | Alpine + focus plugin bootstrap; registers `sortable` | M0/M3 |
+| `resources/js/sortable.js` | Alpine drag-and-drop/keyboard reorder → PATCH {ids} | M3 |
 | `resources/views/layouts/` | `public.blade.php` (guest site), `admin.blade.php` (sidebar/drawer, `$nav` array, account menu), `auth.blade.php` (login / change password) | M0/M2 |
-| `resources/views/admin/` | `dashboard`, `auth/{login,change-password}`, `users/{index,create,edit}`, `settings/edit` | M2 |
+| `resources/views/admin/` | `dashboard`, `auth/{login,change-password}`, `users/{index,create,edit}`, `settings/edit`; `{packages,add-ons,amenities,faqs}/{index,create,edit,_form}`, `gallery/{index,create,edit}` (M3) | M2/M3 |
+| `storage/app/public/{gallery,amenities}/{originals,large,thumbs}/` | Uploaded content images (D-018; not in git) | M3 |
 | `resources/views/partials/` | `head` (meta, vite, styles stack), `admin-sidebar` (nav list) | M0 |
 | `resources/views/components/ui/` | Shared UI components (x-ui.*) | M0 |
 | `resources/views/components/admin/` | Admin-only components (x-admin.*) | M0 |
@@ -78,7 +89,8 @@
 | `tests/Feature/Models/` | FactoriesTest, BookingScopesTest (overlap edge cases), PostgresCompatibilityTest (lowercase emails, jsonb) | M1/M0.1 |
 | `tests/Feature/SeederTest.php` | Seed data, idempotency, owner env guard | M1 |
 | `tests/Feature/Admin/` | AuthTest, AccessControlTest, UsersTest, SettingsTest, DashboardTest | M2 |
-| `tests/Feature/Services/` | SettingServiceTest | M2 |
+| `tests/Feature/Services/` | SettingServiceTest, ContentServiceTest (reorder, image paths) | M2/M3 |
+| `tests/Feature/Admin/Content/` | PackagesTest, AddOnsTest, AmenitiesTest, GalleryTest, FaqsTest, ContentAccessTest | M3 |
 | `tests/Unit/` | MoneyTest, EnumsTest | M1 |
 
 ## Routes Table
@@ -96,6 +108,13 @@
 | resource | `/admin/users` (except show, destroy) | admin.users.* | Admin\UserController | + role:owner | M2 |
 | PATCH | `/admin/users/{user}/active` | admin.users.toggle-active | Admin\UserController@toggleActive | + role:owner | M2 |
 | PUT | `/admin/users/{user}/password` | admin.users.reset-password | Admin\UserController@resetPassword | + role:owner | M2 |
+| resource | `/admin/packages` (except show) | admin.packages.* | Admin\PackageController | + role:owner | M3 |
+| resource | `/admin/add-ons` (except show; param `{add_on}`) | admin.add-ons.* | Admin\AddOnController | + role:owner | M3 |
+| resource | `/admin/amenities` (except show) | admin.amenities.* | Admin\AmenityController | + role:owner | M3 |
+| resource | `/admin/gallery` (except show; param `{gallery}` = GalleryImage) | admin.gallery.* | Admin\GalleryController | + role:owner | M3 |
+| resource | `/admin/faqs` (except show) | admin.faqs.* | Admin\FaqController | + role:owner | M3 |
+| PATCH | `/admin/{packages,amenities,gallery,faqs}/reorder` (JSON `{ids}`; declared before resources) | admin.{module}.reorder | {Module}Controller@reorder | + role:owner | M3 |
+| PATCH | `/admin/gallery/{gallery}/visibility` | admin.gallery.toggle-visibility | Admin\GalleryController@toggleVisibility | + role:owner | M3 |
 
 ## Database Tables
 | Table | Key columns | Relations | Milestone |
@@ -120,16 +139,16 @@ Full dictionary + ERD: `docs/database.md`.
 | Model | Relationships | Scopes / helpers | Milestone |
 |---|---|---|---|
 | User | approvedBookings (hasMany Booking), activityLogs | active(); isOwner(); casts role→UserRole, must_change_password, last_login_at; email mutator lowercases (D-014) | M1/M2 |
-| Package | bookings, pricingRules | active(), ordered(); formatted_price | M1 |
-| AddOn | bookings (belongsToMany via BookingAddOn) | active(); formatted_price | M1 |
+| Package | bookings, pricingRules | active(), ordered(); formatted_price; AdminListable (name, code, description); GuardsDeletion (any booking incl. trashed) | M1/M3 |
+| AddOn | bookings (belongsToMany via BookingAddOn) | active(); formatted_price; AdminListable (name, description); GuardsDeletion (any booking_add_ons row) | M1/M3 |
 | BookingAddOn (Pivot) | booking, addOn | line_total_cents, formattedLineTotal() | M1 |
 | PricingRule | package | active(), forPackage($id) | M1 |
 | Booking | package, approver (User), addOns (pivot quantity/unit_price_cents), payments | active() (pending+approved), overlapping($s,$e), status($enum); formatted_total, formatted_downpayment; guest_email mutator lowercases (D-014); SoftDeletes | M1 |
 | Payment | booking, verifier (User) | verified(); formatted_amount | M1 |
 | BlockedDate | creator (User) | overlapping($s,$e) | M1 |
-| Amenity | — | active(), ordered() | M1 |
-| GalleryImage | — | visible(), ordered() | M1 |
-| Faq | — | active(), ordered() | M1 |
+| Amenity | — | active(), ordered(); AdminListable (name, description); imageUrl(ImageVariant) | M1/M3 |
+| GalleryImage | — | visible(), ordered(); AdminListable (caption; state column is_visible; label = caption or "Image #id"); imageUrl(ImageVariant) | M1/M3 |
+| Faq | — | active(), ordered(); AdminListable (question, answer; label = question ≤60 chars) | M1/M3 |
 | Setting | — | — (read/write only via SettingService, D-017) | M1 |
 | ActivityLog | user, subject (morphTo) | UPDATED_AT = null | M1 |
 
@@ -143,7 +162,8 @@ Full dictionary + ERD: `docs/database.md`.
 | PricingRuleType | weekend, holiday, season; label() | M1 |
 | PricingAdjustmentType | percent (whole % points), fixed (signed centavos); label() | M1 |
 | GalleryCategory | pools, rooms, hall, events; label() | M1 |
-| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated; label(); add cases per module | M2 |
+| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated, content.created/updated/deleted/reordered (M3); label(); add cases per module | M2/M3 |
+| ImageVariant | originals, large (1600), thumbs (480); maxEdge() (D-018) | M3 |
 | SettingGroup | general, booking, payment, contact, social; label(), icon(), fields() = settings registry (D-017) | M2 |
 
 ## Services Index
@@ -153,14 +173,20 @@ Full dictionary + ERD: `docs/database.md`.
 | SettingService | get(key, default), int(key, default), group(SettingGroup), update(SettingGroup, values) → changes (logged), all(), flush(), static declaredDefault(key) | M2 |
 | UserService | create, update, setActive, resetPassword (temp + force change), changeOwnPassword, recordLogin, recordLogout; all audited | M2 |
 | DashboardService | summary(?now) → pending/arrivals_today/upcoming_week/revenue_month_cents; upcoming(limit, ?now) | M2 |
+| Content\ContentService | create(class, data) (sortables appended), update(model, data), delete(model) (GuardsDeletion → ContentInUseException), reorder(class, ids) (D-020); all audited (D-019) | M3 |
+| Content\ImageService | store(UploadedFile, dir) → original path, delete(?path), static variantPath(path, ImageVariant), static url(?path, ImageVariant) (D-018) | M3 |
+| Content\AmenityService | create(data, ?image), update(amenity, data, ?image, removeImage), delete(amenity) | M3 |
+| Content\GalleryService | upload(files, GalleryCategory, ?caption, visible) → list, update, toggleVisibility, delete | M3 |
 
 ## Blade Components
 | Tag | Props | Used in | Milestone |
 |---|---|---|---|
-| `x-ui.button` | variant(primary/secondary/danger/ghost), size(sm/md/lg), type, href, icon | layouts, design-preview | M0 |
+| `x-ui.button` | variant(primary/secondary/danger/ghost/danger-ghost), size(sm/md/lg), type, href, icon | layouts, design-preview | M0 |
 | `x-ui.input` | name* (may be `group[key]`, D-017), label, type, id, value, hint, required | admin forms, design-preview | M0/M2 |
 | `x-ui.select` | name* (may be `group[key]`), options[value=>label], label, id, selected, placeholder, hint, required | admin users, design-preview | M0/M2 |
 | `x-ui.textarea` | name* (may be `group[key]`), label, id, value, rows, hint, required | admin settings, design-preview | M0/M2 |
+| `x-ui.checkbox` | name*, label*, checked, id, hint (hidden "0" + checkbox "1") | content forms | M3 |
+| `x-ui.file-input` | name*, label, accept (jpg/png/webp), multiple (→ name[] + per-file errors), hint, required | amenities, gallery | M3 |
 | `x-ui.card` | title, padded; slots actions, footer | design-preview | M0 |
 | `x-ui.badge` | status (BookingStatus/PaymentStatus/UserRole enum → label/color, D-004), color(pool/garden/amber/rose/slate) | design-preview | M1 |
 | `x-ui.modal` | name*, title, maxWidth(sm/md/lg/xl), show; slot footer; events open-modal/close-modal | design-preview | M0 |
@@ -168,7 +194,12 @@ Full dictionary + ERD: `docs/database.md`.
 | `x-ui.flash` | — (reads session success/error/warning/info) | both layouts | M0 |
 | `x-ui.empty-state` | title, description, icon; default slot = CTA | design-preview | M0 |
 | `x-admin.stat-card` | label*, value*, icon, color(pool/garden/amber/rose), hint | design-preview | M0 |
-| `x-admin.page-header` | title*, description; slot actions | design-preview | M0 |
+| `x-admin.page-header` | title*, description; slot actions | admin pages | M0 |
+| `x-admin.sortable` | url* (reorder endpoint), axis (y list/table, x grid); items need `data-sortable-id` + `draggable="true"` | packages, amenities, gallery, faqs | M3 |
+| `x-admin.sort-handle` | label* (screen-reader name); grip + move up/down buttons | inside x-admin.sortable items | M3 |
+| `x-admin.confirm-delete` | action*, label*, name* (unique modal), warning, size | content indexes | M3 |
+| `x-admin.index-filters` | placeholder, states [value=>label]; slot extra filters; GET q/status | content indexes | M3 |
+| `x-admin.icon-picker` | icons* (AmenityIcons::all()), name (icon), selected, label | amenities form | M3 |
 
 ## Settings Keys
 Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this table documents them.
@@ -229,3 +260,5 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 - No self-service "forgot password" email yet; owner resets passwords (D-015). Revisit in M8. (M2)
 - Dashboard charts/occupancy deferred to M7. (M2)
 - Remove `/design-preview` route + view in M9 (D-007). (M0)
+- Drag-and-drop/icon picker JS verified by markup + endpoint tests only (no browser test run in M3); check manually in Chrome. (M3)
+- Original uploads keep EXIF (possibly GPS) and are publicly reachable by UUID URL; only resized WebP variants are linked. Consider stripping/not keeping originals in M9. (M3)

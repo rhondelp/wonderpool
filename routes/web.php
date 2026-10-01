@@ -1,8 +1,13 @@
 <?php
 
+use App\Http\Controllers\Admin\AddOnController;
+use App\Http\Controllers\Admin\AmenityController;
 use App\Http\Controllers\Admin\Auth\LoginController;
 use App\Http\Controllers\Admin\Auth\PasswordController;
 use App\Http\Controllers\Admin\DashboardController;
+use App\Http\Controllers\Admin\FaqController;
+use App\Http\Controllers\Admin\GalleryController;
+use App\Http\Controllers\Admin\PackageController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Enums\SettingGroup;
@@ -37,6 +42,19 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::resource('users', UserController::class)->except(['show', 'destroy']);
                 Route::patch('users/{user}/active', [UserController::class, 'toggleActive'])->name('users.toggle-active');
                 Route::put('users/{user}/password', [UserController::class, 'resetPassword'])->name('users.reset-password');
+
+                // Content modules (M3). Reorder routes come first so "reorder" is not bound as a {model}.
+                Route::patch('packages/reorder', [PackageController::class, 'reorder'])->name('packages.reorder');
+                Route::patch('amenities/reorder', [AmenityController::class, 'reorder'])->name('amenities.reorder');
+                Route::patch('gallery/reorder', [GalleryController::class, 'reorder'])->name('gallery.reorder');
+                Route::patch('faqs/reorder', [FaqController::class, 'reorder'])->name('faqs.reorder');
+                Route::patch('gallery/{gallery}/visibility', [GalleryController::class, 'toggleVisibility'])->name('gallery.toggle-visibility');
+
+                Route::resource('packages', PackageController::class)->except('show');
+                Route::resource('add-ons', AddOnController::class)->except('show');
+                Route::resource('amenities', AmenityController::class)->except('show');
+                Route::resource('gallery', GalleryController::class)->except('show');
+                Route::resource('faqs', FaqController::class)->except('show');
             });
         });
     });

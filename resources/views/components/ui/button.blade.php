@@ -1,7 +1,7 @@
 {{--
     x-ui.button — Primary action element; renders <a> when `href` is set, otherwise <button>.
 
-    @prop string      $variant  primary|secondary|danger|ghost (default: primary)
+    @prop string      $variant  primary|secondary|danger|ghost|danger-ghost (default: primary)
     @prop string      $size     sm|md|lg (default: md)
     @prop string      $type     Button type attribute when rendered as <button> (default: button)
     @prop string|null $href     If set, renders an anchor link instead of a button
@@ -24,6 +24,7 @@
         'secondary' => 'bg-white text-pool-800 ring-1 ring-inset ring-pool-200 hover:bg-pool-50 focus-visible:ring-pool-500',
         'danger' => 'bg-rose-600 text-white hover:bg-rose-700 focus-visible:ring-rose-500',
         'ghost' => 'bg-transparent text-pool-700 hover:bg-pool-50 focus-visible:ring-pool-500',
+        'danger-ghost' => 'bg-transparent text-rose-700 hover:bg-rose-50 focus-visible:ring-rose-500',
     ];
 
     $sizes = [

@@ -5,8 +5,8 @@
 | M0 | 0 | Setup | Done | 2026-10-01 | 7c42f4f |
 | M0.1 | 0 | Switch database to PostgreSQL (change) | Done | 2026-10-01 | 6209193 |
 | M1 | 1 | Data layer | Done | 2026-10-01 | e1e0b27 |
-| M2 | 2 | Admin foundation | In review | 2026-10-01 | e2b4c84 |
-| M3 | 3 | Content modules | Not started | | |
+| M2 | 2 | Admin foundation | Done | 2026-10-01 | e2b4c84 |
+| M3 | 3 | Content modules | In review | 2026-10-01 | dd0d451 |
 | M4 | 4 | Booking engine | Not started | | |
 | M5 | 5 | Public site | Not started | | |
 | M6 | 6 | Admin bookings | Not started | | |
@@ -30,6 +30,43 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 -->
 
 # Reports
+
+## M3 Content modules (Done 2026-10-01, commit dd0d451)
+**Goal:** Owner can fully manage packages, add-ons, amenities, gallery and FAQs from the admin UI, with validation, audit and ordering.
+**Delivered:**
+- Five owner-only modules (controller, Store/Update Form Requests, policy, views, routes, nav entry); staff get 403
+- Index pages: case-insensitive ILIKE search (wildcards escaped), active/inactive (gallery: visible/hidden, + category) filter, pagination, empty states, success/warning flashes, confirm-delete modal
+- Packages: pesos → centavos, HH:MM times checked against "Ends the next day" (same-day end > start; overnight end ≤ start), unique uppercase code; delete refused when any booking (incl. soft-deleted) uses it → "deactivate instead" warning
+- Add-ons: same guard when used on bookings (FK restrict would otherwise error)
+- Amenities: searchable curated heroicon picker, optional photo (replace/remove)
+- Gallery: multi-upload (≤20 × 5 MB jpg/png/webp), category/caption/visibility, quick show/hide, original + WebP large/thumb versions, files removed on delete
+- FAQs: CRUD + order
+- One reusable sortable component (Alpine `sortable` + x-admin.sortable/sort-handle, drag-and-drop and keyboard up/down) used by packages, amenities, gallery and FAQs; PATCH reorder endpoints with a subset-safe renumbering algorithm
+- Every create/update/delete/reorder logged via ActivityLogger (content.* actions)
+**Files created / modified:**
+- Services/domain: app/Services/Content/{ContentService,ImageService,AmenityService,GalleryService}.php, app/Models/Concerns/AdminListable.php, app/Models/Contracts/GuardsDeletion.php, app/Exceptions/ContentInUseException.php, app/Enums/{ImageVariant,ActivityAction}.php, app/Support/AmenityIcons.php, app/Models/{Package,AddOn,Amenity,GalleryImage,Faq}.php, app/Providers/AppServiceProvider.php
+- HTTP: app/Http/Controllers/Admin/{Package,AddOn,Amenity,Gallery,Faq}Controller.php, app/Http/Requests/Admin/Content/*.php, app/Policies/{Content,Package,AddOn,Amenity,GalleryImage,Faq}Policy.php, routes/web.php
+- UI: resources/js/{sortable,app}.js, resources/views/admin/{packages,add-ons,amenities,gallery,faqs}/*, resources/views/components/admin/{sortable,sort-handle,confirm-delete,index-filters,icon-picker}.blade.php, resources/views/components/ui/{checkbox,file-input,button}.blade.php, resources/views/layouts/admin.blade.php
+- Tests: tests/Feature/Admin/Content/{Packages,AddOns,Amenities,Gallery,Faqs,ContentAccess}Test.php, tests/Feature/Services/ContentServiceTest.php
+- Build/docs: composer.json, composer.lock (intervention/image 3.11), .github/workflows/ci.yml (gd), README.md, docs/{deployment,admin-guide}.md, CHANGELOG.md, HISTORY.md, MILESTONES.md
+**DB changes:** none (M1 tables used as-is).
+**Routes:** resources admin.{packages,add-ons,amenities,gallery,faqs}.* (except show); PATCH admin.{packages,amenities,gallery,faqs}.reorder; PATCH admin.gallery.toggle-visibility.
+**How to verify:** enable `extension=gd` in php.ini → `php artisan storage:link` → sign in as owner → Packages/Add-ons/Amenities/Gallery/FAQs in the sidebar: add, edit, search (try lowercase), filter, drag rows (status line says "Order saved."), delete (package with a booking shows the deactivate warning); upload several gallery images and check thumbnails. Automated: `vendor/bin/pest` (212 tests; tests/Feature/Admin/Content/*, ContentServiceTest), `vendor/bin/pint --test`, `vendor/bin/phpstan analyse` (no errors), `npm run build`.
+**Key decisions:** D-018 (image storage paths/variants), D-019 (ContentService + delete guards + audit), D-020 (ordering + search/filter), D-016 (owner-only).
+**Edit entry points (where to change things later):**
+- Add a field to **Packages**: migration (new `add_*_to_packages_table`), `app/Models/Package.php` ($fillable, casts, @property), `app/Http/Requests/Admin/Content/PackageRequest.php` (rules(); payload() if it needs conversion), `resources/views/admin/packages/_form.blade.php`; optionally the column in `resources/views/admin/packages/index.blade.php` and `adminSearchColumns()`.
+- Add a field to **Add-ons**: migration, `app/Models/AddOn.php`, `app/Http/Requests/Admin/Content/AddOnRequest.php`, `resources/views/admin/add-ons/_form.blade.php` (+ `index.blade.php`).
+- Add a field to **Amenities**: migration, `app/Models/Amenity.php`, `app/Http/Requests/Admin/Content/AmenityRequest.php` (exclude non-column inputs in payload()), `resources/views/admin/amenities/_form.blade.php` (+ `index.blade.php`). New icon choices: `app/Support/AmenityIcons.php`.
+- Add a field to **Gallery**: migration, `app/Models/GalleryImage.php`, `StoreGalleryImagesRequest.php` + `UpdateGalleryImageRequest.php` (rules), `app/Services/Content/GalleryService.php::upload()` (batch fields), `resources/views/admin/gallery/{create,edit}.blade.php`. New category: `app/Enums/GalleryCategory.php`.
+- Add a field to **FAQs**: migration, `app/Models/Faq.php`, `app/Http/Requests/Admin/Content/FaqRequest.php`, `resources/views/admin/faqs/_form.blade.php` (+ `index.blade.php`).
+- Image sizes/quality/paths: `app/Enums/ImageVariant.php` (maxEdge), `app/Services/Content/ImageService.php` (QUALITY, layout). Upload limits: `app/Http/Requests/Admin/Content/ImageRules.php`, `StoreGalleryImagesRequest::MAX_FILES`.
+- Delete guards: `deletionBlockedReason()` in `app/Models/Package.php` / `app/Models/AddOn.php`; implement `GuardsDeletion` on other models to add one.
+- Make another module sortable: wrap its list in `<x-admin.sortable :url>`, add `data-sortable-id` + `draggable="true"` + `<x-admin.sort-handle>` per item, add a PATCH `reorder` route (before the resource) calling `ContentService::reorder()`.
+- Search columns / filter column: `adminSearchColumns()` / `adminStateColumn()` on the model.
+**Known limitations / follow-ups:**
+- JS behaviour (drag-and-drop, keyboard move, icon search) was not exercised in a browser in this phase (Chrome extension unavailable); server endpoints and markup are tested. Manual check recommended.
+- Public originals keep EXIF metadata; consider stripping or not keeping originals (M9).
+- Public pages that display this content come in M5; pricing rules and blocked dates in M4.
 
 ## M2 Admin foundation (Done 2026-10-01, commit e2b4c84)
 **Goal:** Secure admin panel entry (auth, roles), dashboard shell, and owner-editable settings via a cached SettingService.
