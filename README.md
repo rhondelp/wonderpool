@@ -7,7 +7,8 @@ Online booking system for Wonderpool Garden Resort: a public website where guest
 
 ## Requirements
 
-- PHP 8.2+ with `pdo_pgsql` and `pgsql` enabled (in `php.ini`: `extension=pdo_pgsql`, `extension=pgsql`)
+- PHP 8.2+ with `pdo_pgsql`, `pgsql` and `gd` enabled (in `php.ini`: `extension=pdo_pgsql`, `extension=pgsql`, `extension=gd`; gd resizes uploaded images)
+- Run `php artisan storage:link` once so uploaded images (public disk) are served from `/storage`
 - Composer 2
 - Node.js 20+ and npm
 - PostgreSQL 15+

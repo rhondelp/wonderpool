@@ -15,6 +15,28 @@ ENTRY TEMPLATE
 
 ## Unreleased
 
+## [M3] Content modules - 2026-10-01
+### Added
+- Owner-only admin CRUD for packages, add-ons, amenities, gallery, FAQs: index with ILIKE search, active/inactive filter, pagination, empty states, confirm-delete modal, success/warning flashes (files: app/Http/Controllers/Admin/{Package,AddOn,Amenity,Gallery,Faq}Controller.php, resources/views/admin/{packages,add-ons,amenities,gallery,faqs}/*.blade.php, routes/web.php)
+- Form Requests: shared base per module + Store/Update subclasses; package time coherence with crosses_midnight; pesos → centavos; shared image rules jpg/png/webp ≤5 MB ≤8000 px (files: app/Http/Requests/Admin/Content/*.php)
+- Policies: ContentPolicy base + Package/AddOn/Amenity/GalleryImage/Faq policies (owner only); gate manage-content (files: app/Policies/*.php, app/Providers/AppServiceProvider.php)
+- ContentService (create/update/delete/reorder + audit), GuardsDeletion contract + ContentInUseException (package with bookings, add-on used on bookings) (files: app/Services/Content/ContentService.php, app/Models/Contracts/GuardsDeletion.php, app/Exceptions/ContentInUseException.php, app/Models/Package.php, app/Models/AddOn.php)
+- ImageService: original + WebP large (1600 px) and thumbs (480 px) on the public disk; AmenityService and GalleryService (multi-upload, visibility, file cleanup) (files: app/Services/Content/{ImageService,AmenityService,GalleryService}.php, app/Enums/ImageVariant.php)
+- AdminListable model concern (search, whereState, adminLabel) on Package, AddOn, Amenity, GalleryImage, Faq; imageUrl() on Amenity/GalleryImage (files: app/Models/Concerns/AdminListable.php, app/Models/*.php)
+- Reusable sortable list: Alpine `sortable` (drag-and-drop + keyboard) and x-admin.sortable / x-admin.sort-handle, used by packages, amenities, gallery, FAQs; PATCH reorder endpoints (files: resources/js/sortable.js, resources/js/app.js, resources/views/components/admin/sortable.blade.php, resources/views/components/admin/sort-handle.blade.php)
+- Components x-admin.confirm-delete, x-admin.index-filters, x-admin.icon-picker, x-ui.checkbox, x-ui.file-input; button variant danger-ghost (files: resources/views/components/admin/*.blade.php, resources/views/components/ui/{checkbox,file-input,button}.blade.php)
+- Curated amenity icon list (files: app/Support/AmenityIcons.php)
+- ActivityAction content.created/updated/deleted/reordered (files: app/Enums/ActivityAction.php)
+- Tests per module, delete guards, reorder endpoints and algorithm, image variants, staff 403 (files: tests/Feature/Admin/Content/*.php, tests/Feature/Services/ContentServiceTest.php)
+### Changed
+- Admin nav: Packages, Add-ons, Amenities, Gallery, FAQs (files: resources/views/layouts/admin.blade.php)
+- Dependency intervention/image 3.11; CI enables gd (files: composer.json, composer.lock, .github/workflows/ci.yml)
+- Docs: gd + storage:link requirements, upload limits, admin guide content section (files: README.md, docs/deployment.md, docs/admin-guide.md)
+### DB: none (existing M1 tables)
+### Routes: added admin.{packages,add-ons,amenities,gallery,faqs}.{index,create,store,edit,update,destroy}, admin.{packages,amenities,gallery,faqs}.reorder (PATCH), admin.gallery.toggle-visibility (PATCH)
+### Breaking / Notes
+- Requires the PHP gd extension (WebP) and `php artisan storage:link`.
+
 ## [M2] Admin foundation - 2026-10-01
 ### Added
 - Admin sign-in/out at /admin/login: 5 failed attempts per email+IP lockout, disabled accounts rejected, session regeneration, last_login_at, login/logout audit (files: app/Http/Controllers/Admin/Auth/LoginController.php, app/Http/Requests/Admin/LoginRequest.php, resources/views/layouts/auth.blade.php, resources/views/admin/auth/login.blade.php)
