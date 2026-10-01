@@ -5,7 +5,7 @@
 | M0 | 0 | Setup | Done | 2026-10-01 | 7c42f4f |
 | M0.1 | 0 | Switch database to PostgreSQL (change) | Done | 2026-10-01 | 6209193 |
 | M1 | 1 | Data layer | Done | 2026-10-01 | e1e0b27 |
-| M2 | 2 | Admin foundation | In review | 2026-10-01 | PENDING |
+| M2 | 2 | Admin foundation | In review | 2026-10-01 | e2b4c84 |
 | M3 | 3 | Content modules | Not started | | |
 | M4 | 4 | Booking engine | Not started | | |
 | M5 | 5 | Public site | Not started | | |
@@ -31,7 +31,7 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 
 # Reports
 
-## M2 Admin foundation (Done 2026-10-01, commit PENDING)
+## M2 Admin foundation (Done 2026-10-01, commit e2b4c84)
 **Goal:** Secure admin panel entry (auth, roles), dashboard shell, and owner-editable settings via a cached SettingService.
 **Delivered:**
 - `/admin/login` sign-in/out: 5 failed attempts/min lockout per email+IP, disabled accounts rejected, session regeneration, `last_login_at`, login/logout audited
