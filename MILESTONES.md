@@ -6,7 +6,7 @@
 | M0.1 | 0 | Switch database to PostgreSQL (change) | Done | 2026-10-01 | 6209193 |
 | M1 | 1 | Data layer | Done | 2026-10-01 | e1e0b27 |
 | M2 | 2 | Admin foundation | Done | 2026-10-01 | e2b4c84 |
-| M3 | 3 | Content modules | In review | 2026-10-01 | PENDING |
+| M3 | 3 | Content modules | In review | 2026-10-01 | dd0d451 |
 | M4 | 4 | Booking engine | Not started | | |
 | M5 | 5 | Public site | Not started | | |
 | M6 | 6 | Admin bookings | Not started | | |
@@ -31,7 +31,7 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 
 # Reports
 
-## M3 Content modules (Done 2026-10-01, commit PENDING)
+## M3 Content modules (Done 2026-10-01, commit dd0d451)
 **Goal:** Owner can fully manage packages, add-ons, amenities, gallery and FAQs from the admin UI, with validation, audit and ordering.
 **Delivered:**
 - Five owner-only modules (controller, Store/Update Form Requests, policy, views, routes, nav entry); staff get 403
