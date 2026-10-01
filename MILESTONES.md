@@ -9,7 +9,7 @@
 | M3 | 3 | Content modules | Done | 2026-10-01 | dd0d451 |
 | M4 | 4 | Booking engine | Done | 2026-10-01 | a8ee111 |
 | M5 | 5 | Public site | Done | 2026-10-01 | d997511 |
-| M6 | 6 | Admin bookings | In review | 2026-10-01 | PENDING |
+| M6 | 6 | Admin bookings | In review | 2026-10-01 | ff1085c |
 | M7 | 7 | Reports & logs | Not started | | |
 | M8 | 8 | Notifications | Not started | | |
 | M9 | 9 | Hardening | Not started | | |
@@ -31,7 +31,7 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 
 # Reports
 
-## M6 Admin bookings & payments (Done 2026-10-01, commit PENDING)
+## M6 Admin bookings & payments (Done 2026-10-01, commit ff1085c)
 **Goal:** The owner (and staff) can run the complete booking lifecycle from the admin panel, including walk-ins and receipts.
 **Delivered:**
 - Bookings index: status tabs with counts, filters (status, package, stay dates, payment state), ILIKE search on reference/name/phone/email (any phone format), sortable columns, status + payment badges, pagination
