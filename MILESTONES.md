@@ -11,7 +11,7 @@
 | M5 | 5 | Public site | Done | 2026-10-01 | d997511 |
 | M6 | 6 | Admin bookings | Done | 2026-10-01 | ff1085c |
 | M7 | 7 | Reports & logs | Done | 2026-10-03 | a53818f |
-| M8 | 8 | Notifications | In review | 2026-10-03 | (pending) |
+| M8 | 8 | Notifications | In review | 2026-10-03 | 5acc5ee |
 | M9 | 9 | Hardening | Not started | | |
 | M10 | 10 | Deploy & handover | Not started | | |
 
@@ -31,7 +31,7 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 
 # Reports
 
-## M8 Email notifications & reminders (Done 2026-10-03, commit (pending))
+## M8 Email notifications & reminders (Done 2026-10-03, commit 5acc5ee)
 **Goal:** Every booking lifecycle event emails the right person (when switched on), and guests get one reminder before their stay.
 **Delivered:**
 - Queued, branded emails: booking received (guest + owners), approved, rejected with reason, cancelled/expired with reason, payment proof uploaded (owners), reminder before the stay, test email
