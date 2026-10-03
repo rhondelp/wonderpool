@@ -15,6 +15,24 @@ ENTRY TEMPLATE
 
 ## Unreleased
 
+## [M7] Reports & activity log - 2026-10-03
+### Added
+- ReportService: summary (revenue received, booked value, stays, occupancy, status counts), gap-filled daily/monthly series, per-package breakdown, CSV booking rows, 30-day occupancy strip (files: app/Services/ReportService.php)
+- ReportExportService: bookings CSV (UTF-8 BOM, plain peso decimals, formula-injection guard), PDF data, audit-logged exports (files: app/Services/ReportExportService.php)
+- Reports page with presets, filters, charts, status and package tables; CSV and PDF exports, owner only (files: app/Http/Controllers/Admin/ReportController.php, app/Http/Requests/Admin/ReportRequest.php, resources/views/admin/reports/{index,pdf}.blade.php)
+- Activity log screen: filters by person, area, action, dates; ILIKE search on booking reference and details; subject links (files: app/Services/ActivityLogService.php, app/Http/Controllers/Admin/ActivityLogController.php, app/Http/Requests/Admin/ActivityLogRequest.php, resources/views/admin/activity-log/index.blade.php)
+- Components x-admin.bar-chart (server-rendered SVG + data table) and x-admin.occupancy-strip (files: resources/views/components/admin/{bar-chart,occupancy-strip}.blade.php)
+- ActivityAction report.exported + modules(); Money::decimal(), Money::compact(); gate view-activity-log (files: app/Enums/ActivityAction.php, app/Support/Money.php, app/Providers/AppServiceProvider.php)
+- Tests: report figures, pages, exports, access, activity log filters, money helpers (files: tests/Feature/Services/ReportServiceTest.php, tests/Feature/Admin/Reports/{ReportsTest,ActivityLogTest}.php, tests/Unit/MoneyTest.php)
+### Changed
+- Dashboard shows six-month revenue (owner) and confirmed-stay charts plus the next-30-days strip (files: app/Http/Controllers/Admin/DashboardController.php, resources/views/admin/dashboard.blade.php)
+- Admin nav: Reports and Activity log entries; routes (files: resources/views/layouts/admin.blade.php, routes/web.php)
+- Admin guide: reports & activity log (files: docs/admin-guide.md)
+### DB: none
+### Routes: added admin.reports.index, admin.reports.csv, admin.reports.pdf, admin.activity-log
+### Breaking / Notes
+- None. No new dependencies (charts are SVG; PDF reuses DomPDF).
+
 ## [M6] Admin bookings & payments - 2026-10-01
 ### Added
 - Migration: bookings source, created_by, original_total_cents, price_override_reason, cancellation_reason; payments notes, recorded_by, rejection_reason (files: database/migrations/2026_10_01_001600_add_admin_fields_to_bookings_and_payments.php)

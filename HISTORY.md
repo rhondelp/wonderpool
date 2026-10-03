@@ -59,6 +59,9 @@
 | D-031 | 2026-10-01 | Walk-ins: `BookingAdminService::createWalkIn` → `BookingService::create` with `source=admin`, `created_by`; no lead-time rule (a window may have started but not ended); optional payment record and immediate approval in ONE transaction (all or nothing). Owner-only price override: `price_override_cents` + mandatory reason; quote kept in `original_total_cents`, downpayment recomputed with the quoted percent; logged `booking.price_overridden` {from,to,reason}. Checked in StoreWalkInRequest (403 for staff) and again in BookingService. | Flexibility at the counter with an audit trail. | M6 |
 | D-032 | 2026-10-01 | Proofs are viewed only through `GET /admin/payments/{payment}/proof` (auth + active + PaymentPolicy::viewProof), streamed inline from the private `local` disk with `Cache-Control: private, no-store` and `nosniff`; 404 if no file. No public URL is ever generated. | PLAN.md §5.6 / §10. | M6 |
 | D-033 | 2026-10-01 | Admin bookings index: ILIKE search on reference, name, phone, email (+ exact match of a normalized PH phone), filters status/package/stay dates/payment state, sort whitelist (`BookingAdminService::SORTABLE`), status tab counts from one GROUP BY. Receipts use `layouts/print` with an embedded `<style>` block (documented exception to "no inline styles": DomPDF cannot load Vite/Tailwind); no `style=` attributes. | Fast lookup at the front desk; printable/PDF receipts. | M6 |
+| D-034 | 2026-10-03 | Report definitions: **revenue received** = verified payments dated by `verified_at` (same as the dashboard tile); **booked value / confirmed stays / occupancy** = approved + completed bookings dated by `starts_at`; occupancy = distinct stay-start days / days in range. Ranges are whole local days, `to` inclusive, max 731 days, default this month; charts per day up to 62 days, else per month. Package filter applies to payments through their booking (incl. soft-deleted). Charts are server-rendered SVG (`x-admin.bar-chart`, no JS lib) with a data table. | Cash view and occupancy view answer different owner questions; no chart dependency. | M7 |
+| D-035 | 2026-10-03 | Exports (owner only): bookings CSV streamed with UTF-8 BOM, pesos as plain decimals (`Money::decimal`), cells starting with = + - @ tab CR prefixed with `'` (so E.164 phones show as `'+639...`); summary PDF via DomPDF + `layouts/print` (tables only). Every export logs `report.exported` {format, from, to, package_id}. | Excel-friendly; CSV formula injection; guest data leaving the system is audited. | M7 |
+| D-036 | 2026-10-03 | Activity log screen is owner only (gate `view-activity-log` + role:owner), read-only, newest first, 50 per page. Filters: actor (`system` = null user), module prefix, action, dates; search = `properties::text ILIKE` or booking reference. No retention/pruning yet. | PLAN section 2.2 "who did what and when". | M7 |
 | D-014 | 2026-10-01 | Database engine is PostgreSQL. Switched from MySQL on 2026-10-01 because MySQL does not run on the dev machine. JSON columns are jsonb (no key-order guarantee); emails stored lowercase via User/Booking mutators; booking creation to be serialized with `pg_advisory_xact_lock` (PLAN.md §5.2). | Local MariaDB unusable; PostgreSQL available locally and in CI. | M0.1 |
 
 ## Folder Map
@@ -72,23 +75,23 @@
 | `app/Exceptions/Booking/` | BookingException base + SlotUnavailable, GuestCountExceeded, InvalidAddOn, PackageUnavailable, InvalidStatusTransition, ReferenceCodeExhausted (M4); BookingWindow, PaymentProofNotAllowed, InvalidPaymentProof (M5) — messages safe to show | M4/M5 |
 | `app/Events/BookingStatusChanged.php` | Fired after each committed status change (listeners in M8) | M4 |
 | `app/Console/Commands/ExpireStaleBookings.php` | `bookings:expire-stale {--dry-run}` | M4 |
-| `app/Http/Controllers/Admin/` | Admin controllers; `Auth/` = Login, Password; content: Package, AddOn, Amenity, Gallery, Faq (M3); BlockedDate, PricingRule (M4); BookingController, BookingActionController, PaymentController (M6) | M2/M3/M4/M6 |
+| `app/Http/Controllers/Admin/` | Admin controllers; `Auth/` = Login, Password; content: Package, AddOn, Amenity, Gallery, Faq (M3); BlockedDate, PricingRule (M4); BookingController, BookingActionController, PaymentController (M6); ReportController, ActivityLogController (M7) | M2/M3/M4/M6/M7 |
 | `app/Http/Controllers/Public/` | PageController (pages, sitemap, robots), BookingController (book, calendar, quote, store, payment, proof, done), TrackBookingController | M5 |
 | `app/Http/Requests/Public/` | QuoteRequest, StoreBookingRequest (extends Quote), UploadPaymentProofRequest, TrackBookingRequest | M5 |
 | `app/Rules/` | PhilippineMobile, Turnstile (implicit, off by default) | M5 |
 | `app/Http/Middleware/` | EnsureUserIsActive (`active`), EnsurePasswordIsChanged (`password.changed`), EnsureUserHasRole (`role`); aliases in bootstrap/app.php | M2 |
-| `app/Http/Requests/Admin/` | Admin Form Requests (login, passwords, users, settings) | M2 |
+| `app/Http/Requests/Admin/` | Admin Form Requests (login, passwords, users, settings; ReportRequest, ActivityLogRequest M7) | M2/M7 |
 | `app/Http/Requests/Admin/Content/` | `{Module}Request` base (rules + payload()) with Store/Update subclasses; StoreGalleryImagesRequest, UpdateGalleryImageRequest, ReorderRequest, ImageRules | M3 |
 | `app/Http/Requests/Admin/Booking/` | BookingReasonRequest, RescheduleBookingRequest, UpdateBookingNotesRequest, RecordPaymentRequest, RejectPaymentRequest, AdminQuoteRequest, StoreWalkInRequest | M6 |
 | `app/Policies/` | UserPolicy; ContentPolicy base + Package/AddOn/Amenity/GalleryImage/Faq/BlockedDate/PricingRule policies (owner only); BookingPolicy, PaymentPolicy (owner + staff, D-029) | M2/M3/M4/M6 |
-| `app/Providers/AppServiceProvider.php` | Service singletons (+ ImageManager GD), gates (manage-settings, manage-users, manage-content, view-financials, manage-bookings), rate limiters, public view composer | M2/M3/M5/M6 |
-| `app/Services/` | Business logic (see Services Index); `Content/` = content modules + images; `Booking/` = availability, pricing, booking lifecycle, blocked dates | M2/M3/M4 |
+| `app/Providers/AppServiceProvider.php` | Service singletons (+ ImageManager GD), gates (manage-settings, manage-users, manage-content, view-financials, manage-bookings, view-activity-log M7), rate limiters, public view composer | M2/M3/M5/M6 |
+| `app/Services/` | Business logic (see Services Index); `Content/` = content modules + images; `Booking/` = availability, pricing, booking lifecycle, blocked dates; ReportService, ReportExportService, ActivityLogService (M7) | M2/M3/M4/M7 |
 | `app/Models/Concerns/AdminListable.php` | search() ILIKE, whereState(), adminLabel(), adminSearchColumns() | M3 |
 | `app/Models/Contracts/GuardsDeletion.php` | deletionBlockedReason() | M3 |
 | `app/Support/AmenityIcons.php` | Curated heroicons for the amenity picker | M3 |
 | `app/Support/PhoneNumber.php` | normalize() → +639XXXXXXXXX, display() (D-025) | M5 |
 | `app/Models/` | Eloquent models (see Models & Relationships) | M1 |
-| `app/Support/Money.php` | Centavo convert/format helpers (D-001) | M1 |
+| `app/Support/Money.php` | Centavo convert/format helpers (D-001); decimal() for CSV, compact() for chart axes (M7) | M1/M7 |
 | `config/app.php` | timezone = env APP_TIMEZONE (Asia/Manila) | M0 |
 | `config/wonderpool.php` | App config: `owner.name/email/password` from env | M1 |
 | `database/migrations/2026_10_01_*` | M1 schema (users alter + 12 tables) | M1 |
@@ -103,7 +106,7 @@
 | `resources/views/partials/` | `head`, `admin-sidebar`, `availability-calendar` + `quote-panel` (shared by public booking, walk-in, reschedule, M6) | M0/M6 |
 | `resources/views/public/` | home, amenities, packages, gallery, faq, contact, policies, sitemap; `book/{index,payment,done,_summary,_proof-form}`; `track/{index,show}` | M5 |
 | `storage/app/private/payment-proofs/{booking_id}/` | Guest payment proofs (private disk, D-026; not in git) | M5 |
-| `resources/views/admin/` | `dashboard`, `auth/{login,change-password}`, `users/{index,create,edit}`, `settings/edit`; `{packages,add-ons,amenities,faqs}/{index,create,edit,_form}`, `gallery/{index,create,edit}` (M3); `{blocked-dates,pricing-rules}/{index,create,edit,_form}` (M4); `bookings/{index,create,show,receipt}` (M6) | M2/M3/M4/M6 |
+| `resources/views/admin/` | `dashboard`, `auth/{login,change-password}`, `users/{index,create,edit}`, `settings/edit`; `{packages,add-ons,amenities,faqs}/{index,create,edit,_form}`, `gallery/{index,create,edit}` (M3); `{blocked-dates,pricing-rules}/{index,create,edit,_form}` (M4); `bookings/{index,create,show,receipt}` (M6); `reports/{index,pdf}`, `activity-log/index` (M7) | M2/M3/M4/M6/M7 |
 | `storage/app/public/{gallery,amenities}/{originals,large,thumbs}/` | Uploaded content images (D-018; not in git) | M3 |
 | `resources/views/partials/` | `head` (meta, vite, styles stack), `admin-sidebar` (nav list) | M0 |
 | `resources/views/components/ui/` | Shared UI components (x-ui.*) | M0 |
@@ -121,6 +124,8 @@
 | `tests/Feature/Booking/` | AvailabilityServiceTest, PricingServiceTest, ReferenceCodeGeneratorTest, BookingServiceTest (lock, constraint, transitions, reschedule), ExpireStaleBookingsTest | M4 |
 | `tests/Feature/Admin/Booking/` | BlockedDatesTest, PricingRulesTest | M4 |
 | `tests/Feature/Admin/Bookings/` | BookingIndexTest, BookingActionsTest, PaymentsTest, WalkInAndReceiptTest | M6 |
+| `tests/Feature/Admin/Reports/` | ReportsTest (page, exports, access, dashboard charts), ActivityLogTest | M7 |
+| `tests/Feature/Services/ReportServiceTest.php` | Report figures, series, packages, occupancy strip | M7 |
 | `tests/Feature/Public/` | PagesTest, BookingFlowTest, QuoteEndpointTest, TrackBookingTest, AntiAbuseTest | M5 |
 | `tests/Unit/PhoneNumberTest.php` | Phone normalization | M5 |
 | `tests/Pest.php` | Helpers dayPackage(), nightPackage(), fullDayPackage(), bookingData() | M4 |
@@ -158,6 +163,9 @@
 | POST | `/admin/bookings/{booking}/payments` | admin.bookings.payments.store | Admin\PaymentController@store | same | M6 |
 | PATCH | `/admin/payments/{payment}/verify`, `/reject` | admin.payments.verify / .reject | Admin\PaymentController@verify/reject | same | M6 |
 | GET | `/admin/payments/{payment}/proof` | admin.payments.proof | Admin\PaymentController@proof (private disk stream, D-032) | same | M6 |
+| GET | `/admin/reports` (?from,to,package) | admin.reports.index | Admin\ReportController@index | + role:owner (view-financials) | M7 |
+| GET | `/admin/reports/export.csv`, `/admin/reports/export.pdf` (same query) | admin.reports.csv / .pdf | Admin\ReportController@csv/pdf (logged, D-035) | + role:owner | M7 |
+| GET | `/admin/activity-log` (?user,module,action,from,to,q) | admin.activity-log | Admin\ActivityLogController (invokable) | + role:owner (view-activity-log) | M7 |
 | GET | `/admin/settings` | admin.settings.index | redirect → /admin/settings/general | + role:owner | M2 |
 | GET/PUT | `/admin/settings/{group}` | admin.settings.edit / .update | Admin\SettingController@edit/update ({group} = SettingGroup) | + role:owner | M2 |
 | resource | `/admin/users` (except show, destroy) | admin.users.* | Admin\UserController | + role:owner | M2 |
@@ -219,7 +227,7 @@ Full dictionary + ERD: `docs/database.md`.
 | PricingRuleType | weekend, holiday, season; label() | M1 |
 | PricingAdjustmentType | percent (whole % points), fixed (signed centavos); label() | M1 |
 | GalleryCategory | pools, rooms, hall, events; label() | M1 |
-| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated, content.created/updated/deleted/reordered (M3), booking.created/status_changed/rescheduled/expired (M4), payment.proof_uploaded (M5), booking.price_overridden/notes_updated, payment.recorded/verified/rejected (M6); label(); add cases per module | M2/M3/M4/M5/M6 |
+| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated, content.created/updated/deleted/reordered (M3), booking.created/status_changed/rescheduled/expired (M4), payment.proof_uploaded (M5), booking.price_overridden/notes_updated, payment.recorded/verified/rejected (M6), report.exported (M7); label(); static modules() = prefix => label (M7); add cases per module | M2/M3/M4/M5/M6/M7 |
 | ImageVariant | originals, large (1600), thumbs (480); maxEdge() (D-018) | M3 |
 | BookingSource | guest, admin; label() | M6 |
 | PaymentState | unpaid, proof_pending, partial, paid (derived, D-030); label(), color() | M6 |
@@ -246,6 +254,9 @@ Full dictionary + ERD: `docs/database.md`.
 | Booking\PaymentProofService | store(Booking, UploadedFile, ?string $referenceNo = null): Payment (@throws PaymentProofNotAllowed, InvalidPaymentProof); constants DISK=local, DIRECTORY, MAX_EDGE, QUALITY (D-026) | M5 |
 | Booking\PaymentService | record(Booking, PaymentType, int $amountCents, User $actor, ?string $referenceNo = null, ?string $notes = null): Payment (verified; @throws PaymentActionNotAllowed); verify(Payment, User): Payment (@throws PaymentActionNotAllowed); reject(Payment, User, string $reason): Payment (void verified = owner; @throws PaymentActionNotAllowed); verifyPendingProofs(Booking, User): int; summary(Booking): array{total, verified, pending, balance_due, downpayment_required, downpayment_covered, state: PaymentState} (D-030) | M6 |
 | Booking\BookingAdminService | approve(Booking, User): Booking (@throws DownpaymentNotCovered, InvalidStatusTransition); reject(Booking, User, string $reason); cancel(Booking, User, ?string $reason); complete(Booking, User); reschedule(Booking, CarbonInterface $date, User, ?Package, bool $reprice); updateNotes(Booking, User, ?string); createWalkIn(array $data, User): Booking (@throws BookingException; D-031); timeline(Booking): list<array{at, action, label, actor, details}>; statusCounts(): array<status, int>; listing(array $filters, int $perPage = 20): LengthAwarePaginator (D-033); const SORTABLE | M6 |
+| ReportService | summary(from, to, ?packageId): revenue_cents, payments, bookings, by_status, confirmed, booked_value_cents, average_cents, occupied_days, days, occupancy_percent; series(from, to, ?packageId, ?granularity day/month): list{key,label,revenue_cents,bookings}; byPackage(from, to): list{package, bookings, booked_value_cents, revenue_cents}; bookingRows(from, to, ?packageId): LazyCollection<Booking> (+verified_cents); occupancyStrip(days = 30, ?now): list{date, state confirmed/pending/closed/free}; granularity(), days(); static confirmedStatuses(); const MAX_RANGE_DAYS, DAILY_LIMIT_DAYS (D-034) | M7 |
+| ReportExportService | writeCsv(resource, from, to, ?packageId); csvRow(Booking); pdfData(from, to, ?packageId); filename(from, to, ext); logExport(User, format, from, to, ?packageId); static safeCell(string); const CSV_HEADERS (D-035) | M7 |
+| ActivityLogService | listing(filters, perPage = 50): LengthAwarePaginator; subjectLabel(log), subjectUrl(log), details(log): array<label, string>, actionLabel(string), actorOptions(); const SYSTEM_ACTOR (D-036) | M7 |
 | PublicContentService | site(): array{name, tagline, phone, email, address, map_embed_url, facebook_url, instagram_url, meta_description, og_image_url}; text(key): ?string; highlights(): list<string>; packages(); addOns(); amenities(?limit); gallery(?limit); faqs() — active/visible only (D-027) | M5 |
 
 ## Blade Components
@@ -270,6 +281,8 @@ Full dictionary + ERD: `docs/database.md`.
 | `x-admin.confirm-delete` | action*, label*, name* (unique modal), warning, size | content indexes | M3 |
 | `x-admin.index-filters` | placeholder, states [value=>label]; slot extra filters; GET q/status | content indexes | M3 |
 | `x-admin.icon-picker` | icons* (AmenityIcons::all()), name (icon), selected, label | amenities form | M3 |
+| `x-admin.bar-chart` | title*, items* [label, value, display], axis (Closure for y ticks), unit, summary; SVG bars + `<title>` tooltips + "Show data" table | dashboard, reports | M7 |
+| `x-admin.occupancy-strip` | strip* (ReportService::occupancyStrip), title; color + icon + sr-only text per day, legend | dashboard | M7 |
 | `x-ui.wave-divider` | flip; color via text-* class (currentColor) | public layout, heroes | M5 |
 | `x-ui.section` | title, intro, id, when (false = render nothing) | public pages | M5 |
 | `x-ui.prose` | text (owner Markdown-lite, HTML stripped; renders nothing when blank) | home, policies, booking, track | M5 |
@@ -364,14 +377,14 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 - Resolved in M0.1: local MariaDB was unusable, so the project moved to PostgreSQL (D-014); schema verified with migrate:fresh --seed, rollback and re-migrate on PostgreSQL 18. (M0/M1/M0.1)
 - Settings contact/payment/social values are placeholders; replace once the owner answers PLAN.md §14 Q5. (M1)
 - Day package hours (7AM–5PM) and Day max pax (50) are proposed defaults pending owner confirmation (PLAN.md §1). (M1)
-- Admin nav lists built modules only; add Reports/Activity log entries to `$nav` in layouts/admin.blade.php in M7. (M0/M2/M6)
 - Admin booking modals (reschedule calendar, proof preview) and the receipt print button were not run in a real browser in M6 (Chrome extension unavailable); endpoints and markup are tested. (M6)
 - Cancelling does not create refund records; refunds are handled outside the system (D-030). (M6)
 - Booking page JS (calendar, quote, steps), gallery lightbox and copy button were not run in a real browser in M5 (Chrome extension unavailable); server endpoints/markup are tested. Manual check recommended. (M5)
 - PDF proofs are stored as uploaded (metadata not stripped). (M5)
 - Settings content/house rules/cancellation policy are placeholders until the owner provides them (§14). (M5)
 - No self-service "forgot password" email yet; owner resets passwords (D-015). Revisit in M8. (M2)
-- Dashboard charts/occupancy deferred to M7. (M2)
+- Charts (dashboard, reports) were verified by markup/data tests only, not viewed in a real browser in M7. (M7)
+- Activity log has no retention/pruning; consider a cleanup command if it grows large. (M7)
 - Production needs the scheduler cron (`* * * * * php artisan schedule:run`) for booking expiry (D-024). (M4)
 - Exclusion constraint does not cover blocked dates; only the service check does. (M4)
 - Pricing-rule form preview (Alpine) mirrors `applyRule()` for one rule; keep both in sync if the formula changes. (M4)

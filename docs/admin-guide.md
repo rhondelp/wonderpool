@@ -35,6 +35,12 @@ Owner only. Every list has a search box (not case-sensitive) and an Active/Inact
 - Unpaid pending bookings are cancelled automatically after the pending hold time (Settings → Booking rules) if no payment proof was uploaded.
 
 ## Reports & activity logs
+- **Dashboard** (everyone): confirmed stays per month for the last six months and the next 30 days at a glance (confirmed, pending, blocked, open). The owner also sees revenue received per month. Hover a bar for its value or open "Show data" for the numbers.
+- **Reports** (owner only): pick a preset (this month, last month, last 30 days, this year, last year) or any range up to two years, optionally one package. You see revenue received, booked value, confirmed stays, occupancy, a chart per day (ranges up to 62 days) or per month, bookings by status and a per-package table.
+  - *Revenue received* = verified payments, counted on the day they were verified. *Booked value*, *stays* and *occupancy* = approved and completed bookings, counted on the stay date. Occupancy = days with at least one confirmed stay ÷ days in the range.
+  - **Bookings CSV** downloads every booking whose stay starts in the range (guest details, status, total, paid, balance) and opens in Excel. **Summary PDF** downloads the figures as a printable page. Each download is recorded in the activity log because the CSV contains guest details.
+- **Activity log** (owner only): every sign-in, booking action, payment, content and settings change, with who did it and when. Filter by person ("Guest / system" = website guests and automatic jobs), area, action and dates, or search a booking reference or any detail. Entries cannot be edited or deleted.
+
 ## Website content
 - Settings → **Website content**: home headline and sub-headline, about text, highlights (one per line), house rules, cancellation policy and the "what happens next" note guests see after booking. Leave a field blank to hide that section. Use `**bold**` and lines starting with `- ` for lists.
 - Settings → **SEO**: the description Google shows and the image used when the site is shared on Facebook.

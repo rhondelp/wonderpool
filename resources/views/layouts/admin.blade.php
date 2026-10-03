@@ -10,6 +10,7 @@
     $nav = [
         ['label' => 'Dashboard', 'icon' => 'home', 'route' => 'admin.dashboard', 'active' => 'admin.dashboard', 'can' => null],
         ['label' => 'Bookings', 'icon' => 'calendar-days', 'route' => 'admin.bookings.index', 'active' => 'admin.bookings.*', 'can' => 'manage-bookings'],
+        ['label' => 'Reports', 'icon' => 'chart-bar', 'route' => 'admin.reports.index', 'active' => 'admin.reports.*', 'can' => 'view-financials'],
         ['label' => 'Packages', 'icon' => 'cube', 'route' => 'admin.packages.index', 'active' => 'admin.packages.*', 'can' => 'manage-content'],
         ['label' => 'Pricing rules', 'icon' => 'receipt-percent', 'route' => 'admin.pricing-rules.index', 'active' => 'admin.pricing-rules.*', 'can' => 'manage-content'],
         ['label' => 'Blocked dates', 'icon' => 'no-symbol', 'route' => 'admin.blocked-dates.index', 'active' => 'admin.blocked-dates.*', 'can' => 'manage-content'],
@@ -18,6 +19,7 @@
         ['label' => 'Gallery', 'icon' => 'photo', 'route' => 'admin.gallery.index', 'active' => 'admin.gallery.*', 'can' => 'manage-content'],
         ['label' => 'FAQs', 'icon' => 'question-mark-circle', 'route' => 'admin.faqs.index', 'active' => 'admin.faqs.*', 'can' => 'manage-content'],
         ['label' => 'Users', 'icon' => 'users', 'route' => 'admin.users.index', 'active' => 'admin.users.*', 'can' => 'manage-users'],
+        ['label' => 'Activity log', 'icon' => 'clipboard-document-list', 'route' => 'admin.activity-log', 'active' => 'admin.activity-log', 'can' => 'view-activity-log'],
         ['label' => 'Settings', 'icon' => 'cog-6-tooth', 'route' => 'admin.settings.index', 'active' => 'admin.settings.*', 'can' => 'manage-settings'],
     ];
     $nav = array_values(array_filter($nav, fn (array $item): bool => $item['can'] === null || (auth()->user()?->can($item['can']) ?? false)));

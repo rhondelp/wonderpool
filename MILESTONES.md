@@ -9,8 +9,8 @@
 | M3 | 3 | Content modules | Done | 2026-10-01 | dd0d451 |
 | M4 | 4 | Booking engine | Done | 2026-10-01 | a8ee111 |
 | M5 | 5 | Public site | Done | 2026-10-01 | d997511 |
-| M6 | 6 | Admin bookings | In review | 2026-10-01 | ff1085c |
-| M7 | 7 | Reports & logs | Not started | | |
+| M6 | 6 | Admin bookings | Done | 2026-10-01 | ff1085c |
+| M7 | 7 | Reports & logs | In review | 2026-10-03 | a53818f |
 | M8 | 8 | Notifications | Not started | | |
 | M9 | 9 | Hardening | Not started | | |
 | M10 | 10 | Deploy & handover | Not started | | |
@@ -30,6 +30,35 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 -->
 
 # Reports
+
+## M7 Reports & activity log (Done 2026-10-03, commit a53818f)
+**Goal:** The owner sees how the resort is doing (revenue, stays, occupancy), can export it, and can audit who did what.
+**Delivered:**
+- Dashboard: six-month "Revenue received" (owner only) and "Confirmed stays" bar charts, next-30-days occupancy strip (confirmed / pending / blocked / open)
+- Reports page (owner): presets + custom range (up to 2 years) + package filter; tiles for revenue received, booked value (avg per stay), confirmed stays, occupancy; per-day or per-month charts; bookings by status; per-package table with drill-down links
+- Exports: bookings CSV (Excel-friendly, formula-safe) and summary PDF; each export audit-logged
+- Activity log (owner): newest first, filters (person incl. guest/system, area, action, dates), search by booking reference or any detail, links to the record, readable details
+- Charts are dependency-free server-rendered SVG with hover tooltips and a "Show data" table
+**Files created / modified:**
+- Services: app/Services/{ReportService,ReportExportService,ActivityLogService}.php (new)
+- HTTP: app/Http/Controllers/Admin/{ReportController,ActivityLogController}.php (new), DashboardController.php; app/Http/Requests/Admin/{ReportRequest,ActivityLogRequest}.php (new); routes/web.php; app/Providers/AppServiceProvider.php (gate view-activity-log)
+- Domain: app/Enums/ActivityAction.php (report.exported, modules()), app/Support/Money.php (decimal, compact)
+- Views: resources/views/admin/reports/{index,pdf}.blade.php, resources/views/admin/activity-log/index.blade.php, resources/views/components/admin/{bar-chart,occupancy-strip}.blade.php, resources/views/admin/dashboard.blade.php, resources/views/layouts/admin.blade.php
+- Tests: tests/Feature/Services/ReportServiceTest.php, tests/Feature/Admin/Reports/{ReportsTest,ActivityLogTest}.php, tests/Unit/MoneyTest.php
+- Docs: CHANGELOG.md, HISTORY.md, MILESTONES.md, docs/admin-guide.md
+**DB changes:** none.
+**Routes:** admin.reports.index, admin.reports.csv, admin.reports.pdf, admin.activity-log.
+**How to verify:** sign in as owner, Dashboard shows two charts and the 30-day strip; Reports: try presets, a package, "Show data"; Bookings CSV opens in Excel (phones shown as '+639...); Summary PDF; Activity log shows two "Exported report" entries; filter Area = Bookings, search a reference. As staff: no Reports/Activity log in the nav, URLs return 403, dashboard has no revenue chart. Automated: `vendor/bin/pest` (502 tests; tests/Feature/Services/ReportServiceTest.php, tests/Feature/Admin/Reports/*), `vendor/bin/pint --test`, `vendor/bin/phpstan analyse` (no errors), `npm run build`.
+**Key decisions:** D-034 (report definitions, SVG charts), D-035 (exports), D-036 (activity log access/search).
+**Edit entry points (where to change things later):**
+- **Report definitions** (what counts as revenue/stays/occupancy): `app/Services/ReportService.php` -> `summary()`, `series()`, `byPackage()`, `confirmedStatuses()`; range limits `MAX_RANGE_DAYS`, `DAILY_LIMIT_DAYS`; presets in `resources/views/admin/reports/index.blade.php` (`$presets`).
+- **CSV columns:** `ReportExportService::CSV_HEADERS` + `csvRow()` (keep both in the same order); PDF layout `resources/views/admin/reports/pdf.blade.php`.
+- **Dashboard charts:** months shown `DashboardController::CHART_MONTHS`; strip length `occupancyStrip(30)`; chart look `resources/views/components/admin/bar-chart.blade.php`.
+- **Activity log:** filters/search in `ActivityLogService::listing()`, record links in `subjectUrl()`, area names in `ActivityAction::modules()`, labels in `ActivityAction::label()`.
+**Known limitations / follow-ups:**
+- Charts and pages not viewed in a real browser (verified by markup and data tests).
+- Activity log has no retention/pruning.
+- Revenue is cash-based; refunds are outside the system (D-030), so voided payments simply drop out.
 
 ## M6 Admin bookings & payments (Done 2026-10-01, commit ff1085c)
 **Goal:** The owner (and staff) can run the complete booking lifecycle from the admin panel, including walk-ins and receipts.

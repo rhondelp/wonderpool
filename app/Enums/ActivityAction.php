@@ -31,6 +31,25 @@ enum ActivityAction: string
     case PaymentRecorded = 'payment.recorded';
     case PaymentVerified = 'payment.verified';
     case PaymentRejected = 'payment.rejected';
+    case ReportExported = 'report.exported';
+
+    /**
+     * Module prefixes (the part before the dot) with labels, for the activity log filter.
+     *
+     * @return array<string, string>
+     */
+    public static function modules(): array
+    {
+        return [
+            'auth' => 'Sign-in',
+            'user' => 'Users',
+            'settings' => 'Settings',
+            'content' => 'Content',
+            'booking' => 'Bookings',
+            'payment' => 'Payments',
+            'report' => 'Reports',
+        ];
+    }
 
     /**
      * Human-readable label for the activity log screen.
@@ -61,6 +80,7 @@ enum ActivityAction: string
             self::PaymentRecorded => 'Recorded payment',
             self::PaymentVerified => 'Verified payment',
             self::PaymentRejected => 'Rejected payment',
+            self::ReportExported => 'Exported report',
         };
     }
 }

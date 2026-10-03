@@ -14,6 +14,26 @@
         @endcan
     </div>
 
+    <div @class(['mt-6 grid gap-4', 'xl:grid-cols-2' => $showFinancials])>
+        @if ($showFinancials)
+            <x-admin.bar-chart
+                title="Revenue received"
+                summary="Verified payments per month, last {{ count($months) }} months"
+                unit="Revenue"
+                :items="array_map(fn ($m) => ['label' => $m['label'], 'value' => $m['revenue_cents'], 'display' => \App\Support\Money::format($m['revenue_cents'])], $months)"
+                :axis="fn ($v) => \App\Support\Money::compact($v)"
+            />
+        @endif
+        <x-admin.bar-chart
+            title="Confirmed stays"
+            summary="Approved and completed bookings by stay month"
+            unit="Stays"
+            :items="array_map(fn ($m) => ['label' => $m['label'], 'value' => $m['bookings'], 'display' => (string) $m['bookings']], $months)"
+        />
+    </div>
+
+    <x-admin.occupancy-strip :strip="$strip" class="mt-6" />
+
     <x-ui.card title="Upcoming bookings" class="mt-6" :padded="$upcoming->isEmpty()">
         @if ($upcoming->isEmpty())
             <x-ui.empty-state title="No upcoming bookings" description="Pending and approved bookings will appear here." icon="calendar" />
@@ -44,6 +64,4 @@
             </div>
         @endif
     </x-ui.card>
-
-    <p class="mt-6 text-sm text-slate-500">Occupancy and revenue charts arrive with Reports.</p>
 @endsection
