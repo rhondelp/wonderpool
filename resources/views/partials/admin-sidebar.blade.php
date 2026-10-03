@@ -29,3 +29,7 @@
         @endforeach
     </ul>
 </nav>
+
+<p class="border-t border-pool-900 px-6 py-4 text-xs text-pool-300">
+    Developed by <a href="mailto:{{ config('wonderpool.developer.email') }}" class="font-medium text-pool-100 hover:text-white hover:underline">{{ config('wonderpool.developer.name') }}</a>
+</p>

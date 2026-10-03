@@ -103,7 +103,10 @@
             @endif
         </div>
         <div class="border-t border-pool-900">
-            <p class="mx-auto max-w-7xl px-4 py-4 text-xs text-pool-300 sm:px-6 lg:px-8">&copy; {{ now()->year }} {{ $site['name'] }}</p>
+            <div class="mx-auto flex max-w-7xl flex-col gap-1 px-4 py-4 text-xs text-pool-300 sm:flex-row sm:justify-between sm:px-6 lg:px-8">
+                <p>&copy; {{ now()->year }} {{ $site['name'] }}</p>
+                <p>Website by <a href="mailto:{{ config('wonderpool.developer.email') }}" class="font-medium text-pool-100 hover:text-white hover:underline">{{ config('wonderpool.developer.name') }}</a></p>
+            </div>
         </div>
     </footer>
 

@@ -82,3 +82,7 @@ vendor/bin/phpstan analyse      # Larastan level 6 (phpstan.neon)
 CI (`.github/workflows/ci.yml`) runs Pint, Larastan, the asset build and Pest on every push to `main` and every pull request.
 
 Conventions (thin controllers, services, Form Requests, enums, Conventional Commits, branch-per-phase) are listed in `CLAUDE.md` and `HISTORY.md`.
+
+## Developer
+
+Designed and developed by **Rhondel M. Pagobo** · [rhondelpagobo19@gmail.com](mailto:rhondelpagobo19@gmail.com)
