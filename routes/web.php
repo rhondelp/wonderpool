@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\AddOnController;
 use App\Http\Controllers\Admin\AmenityController;
 use App\Http\Controllers\Admin\Auth\LoginController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\Admin\GalleryController;
 use App\Http\Controllers\Admin\PackageController;
 use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PricingRuleController;
+use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
 use App\Enums\SettingGroup;
@@ -119,6 +121,12 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 // Booking engine admin (M4).
                 Route::resource('blocked-dates', BlockedDateController::class)->except('show');
                 Route::resource('pricing-rules', PricingRuleController::class)->except('show');
+
+                // Reports & activity log (M7).
+                Route::get('reports', [ReportController::class, 'index'])->name('reports.index');
+                Route::get('reports/export.csv', [ReportController::class, 'csv'])->name('reports.csv');
+                Route::get('reports/export.pdf', [ReportController::class, 'pdf'])->name('reports.pdf');
+                Route::get('activity-log', ActivityLogController::class)->name('activity-log');
             });
         });
     });
