@@ -5,6 +5,7 @@ namespace App\Services\Booking;
 use App\Enums\ActivityAction;
 use App\Enums\BookingSource;
 use App\Enums\BookingStatus;
+use App\Events\BookingCreated;
 use App\Events\BookingStatusChanged;
 use App\Exceptions\Booking\GuestCountExceededException;
 use App\Exceptions\Booking\InvalidAddOnException;
@@ -145,6 +146,9 @@ class BookingService
                 ], $actor);
             }
 
+            // Listeners run only after the transaction commits (ShouldHandleEventsAfterCommit).
+            BookingCreated::dispatch($booking, $actor);
+
             return $booking;
         }));
     }
@@ -229,6 +233,7 @@ class BookingService
                 ]);
             }
 
+            $booking->reminded_at = null; // a moved stay gets its own reminder (D-038)
             $booking->save();
 
             if ($reprice) {

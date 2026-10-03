@@ -16,6 +16,7 @@ use App\Http\Controllers\Admin\PaymentController;
 use App\Http\Controllers\Admin\PricingRuleController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\TestEmailController;
 use App\Http\Controllers\Admin\UserController;
 use App\Enums\SettingGroup;
 use App\Http\Controllers\Public\BookingController;
@@ -100,6 +101,7 @@ Route::prefix('admin')->name('admin.')->group(function () {
                 Route::redirect('settings', '/admin/settings/'.SettingGroup::General->value)->name('settings.index');
                 Route::get('settings/{group}', [SettingController::class, 'edit'])->name('settings.edit');
                 Route::put('settings/{group}', [SettingController::class, 'update'])->name('settings.update');
+                Route::post('settings/notifications/test-email', TestEmailController::class)->middleware('throttle:5,1')->name('settings.test-email');
 
                 Route::resource('users', UserController::class)->except(['show', 'destroy']);
                 Route::patch('users/{user}/active', [UserController::class, 'toggleActive'])->name('users.toggle-active');

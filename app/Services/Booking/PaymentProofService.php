@@ -6,6 +6,7 @@ use App\Enums\ActivityAction;
 use App\Enums\BookingStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\PaymentType;
+use App\Events\PaymentProofUploaded;
 use App\Exceptions\Booking\InvalidPaymentProofException;
 use App\Exceptions\Booking\PaymentProofNotAllowedException;
 use App\Models\Booking;
@@ -97,6 +98,8 @@ class PaymentProofService
                     'replaced' => $oldPath !== null,
                     'kind' => $this->isPdf($file) ? 'pdf' : 'image',
                 ]);
+
+                PaymentProofUploaded::dispatch($booking, $payment);
 
                 if ($oldPath !== null && $oldPath !== $path) {
                     DB::afterCommit(fn () => Storage::disk(self::DISK)->delete($oldPath));
