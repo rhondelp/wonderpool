@@ -93,7 +93,7 @@
 | `app/Models/` | Eloquent models (see Models & Relationships) | M1 |
 | `app/Support/Money.php` | Centavo convert/format helpers (D-001); decimal() for CSV, compact() for chart axes (M7) | M1/M7 |
 | `config/app.php` | timezone = env APP_TIMEZONE (Asia/Manila) | M0 |
-| `config/wonderpool.php` | App config: `owner.name/email/password` from env | M1 |
+| `config/wonderpool.php` | App config: `owner.name/email/password` from env; `developer.name/email` credit (footer, admin sidebar) | M1/change |
 | `database/migrations/2026_10_01_*` | M1 schema (users alter + 12 tables) | M1 |
 | `database/factories/` | Factory per model; `Concerns/PhilippineData` (PH names, +639 mobiles) | M1 |
 | `database/seeders/` | DatabaseSeeder → Owner, Package, Amenity, Setting, Faq seeders | M1 |

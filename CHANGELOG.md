@@ -15,6 +15,12 @@ ENTRY TEMPLATE
 
 ## Unreleased
 
+## [change/developer-credits] Developer credits - 2026-10-03
+### Added
+- Developer credit (name + email, no phone: public repo) in the public footer and admin sidebar, from `config('wonderpool.developer')`; README "Developer" section; composer.json authors (files: config/wonderpool.php, resources/views/layouts/public.blade.php, resources/views/partials/admin-sidebar.blade.php, README.md, composer.json, tests/Feature/DeveloperCreditTest.php)
+### DB: none
+### Routes: none
+
 ## [M7] Reports & activity log - 2026-10-03
 ### Added
 - ReportService: summary (revenue received, booked value, stays, occupancy, status counts), gap-filled daily/monthly series, per-package breakdown, CSV booking rows, 30-day occupancy strip (files: app/Services/ReportService.php)
