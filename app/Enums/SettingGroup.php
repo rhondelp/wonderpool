@@ -16,6 +16,7 @@ enum SettingGroup: string
     case Social = 'social';
     case Content = 'content';
     case Seo = 'seo';
+    case Notifications = 'notifications';
 
     /**
      * Tab label on the settings screen.
@@ -30,6 +31,7 @@ enum SettingGroup: string
             self::Social => 'Social links',
             self::Content => 'Website content',
             self::Seo => 'SEO',
+            self::Notifications => 'Notifications',
         };
     }
 
@@ -46,11 +48,13 @@ enum SettingGroup: string
             self::Social => 'share',
             self::Content => 'document-text',
             self::Seo => 'magnifying-glass',
+            self::Notifications => 'bell',
         };
     }
 
     /**
-     * Field definitions keyed by full setting key. `type` is the input type: text|number|email|url|textarea.
+     * Field definitions keyed by full setting key. `type` is the input type: text|number|email|url|textarea|checkbox
+     * (checkbox values are stored as "1"/"0").
      *
      * @return array<string, array{label: string, type: string, default: string, rules: list<string>, hint?: string}>
      */
@@ -59,6 +63,7 @@ enum SettingGroup: string
         return match ($this) {
             self::General => [
                 'general.resort_name' => ['label' => 'Resort name', 'type' => 'text', 'default' => 'Wonderpool Garden Resort', 'rules' => ['required', 'string', 'max:100']],
+                'general.logo_url' => ['label' => 'Logo URL', 'type' => 'url', 'default' => '', 'rules' => ['nullable', 'url:https', 'max:2000'], 'hint' => 'HTTPS link to a PNG/JPG logo, shown at the top of emails. Blank = resort name as text.'],
             ],
             self::Booking => [
                 'booking.downpayment_percent' => ['label' => 'Downpayment (%)', 'type' => 'number', 'default' => '50', 'rules' => ['required', 'integer', 'min:0', 'max:100'], 'hint' => 'Share of the total the guest pays to secure a booking.'],
@@ -93,6 +98,15 @@ enum SettingGroup: string
                 'seo.meta_description' => ['label' => 'Search description', 'type' => 'textarea', 'default' => 'Wonderpool Garden Resort: private pools, gardens and function hall. Check availability and book online.', 'rules' => ['nullable', 'string', 'max:300'], 'hint' => 'Shown by Google and when the site is shared (about 155 characters).'],
                 'seo.og_image_url' => ['label' => 'Share image URL', 'type' => 'url', 'default' => '', 'rules' => ['nullable', 'url:https', 'max:2000'], 'hint' => 'Image shown when the site is shared on Facebook. Blank = first gallery photo.'],
             ],
+            self::Notifications => array_merge(
+                array_combine(
+                    array_map(fn (NotificationType $type): string => $type->settingKey(), NotificationType::cases()),
+                    array_map(fn (NotificationType $type): array => ['label' => $type->label(), 'type' => 'checkbox', 'default' => '1', 'rules' => ['required', 'boolean']], NotificationType::cases()),
+                ),
+                [
+                    'notifications.reminder_days_before' => ['label' => 'Send the reminder (days before the stay)', 'type' => 'number', 'default' => '1', 'rules' => ['required', 'integer', 'min:1', 'max:7'], 'hint' => 'Reminders go out once, at '.config('wonderpool.notifications.reminder_time', '09:00').' on that day.'],
+                ],
+            ),
         };
     }
 }

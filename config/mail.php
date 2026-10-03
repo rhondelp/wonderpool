@@ -115,4 +115,23 @@ return [
         'name' => env('MAIL_FROM_NAME', env('APP_NAME', 'Laravel')),
     ],
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Markdown Mail (M8)
+    |--------------------------------------------------------------------------
+    |
+    | Branded components and the "wonderpool" theme live in resources/views/mail
+    | (html/, text/, html/themes/wonderpool.css).
+    |
+    */
+
+    'markdown' => [
+        'theme' => 'wonderpool',
+
+        'paths' => [
+            resource_path('views/mail'),
+        ],
+    ],
+
 ];

@@ -10,8 +10,8 @@
 | M4 | 4 | Booking engine | Done | 2026-10-01 | a8ee111 |
 | M5 | 5 | Public site | Done | 2026-10-01 | d997511 |
 | M6 | 6 | Admin bookings | Done | 2026-10-01 | ff1085c |
-| M7 | 7 | Reports & logs | In review | 2026-10-03 | a53818f |
-| M8 | 8 | Notifications | Not started | | |
+| M7 | 7 | Reports & logs | Done | 2026-10-03 | a53818f |
+| M8 | 8 | Notifications | In review | 2026-10-03 | 5acc5ee |
 | M9 | 9 | Hardening | Not started | | |
 | M10 | 10 | Deploy & handover | Not started | | |
 
@@ -30,6 +30,38 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 -->
 
 # Reports
+
+## M8 Email notifications & reminders (Done 2026-10-03, commit 5acc5ee)
+**Goal:** Every booking lifecycle event emails the right person (when switched on), and guests get one reminder before their stay.
+**Delivered:**
+- Queued, branded emails: booking received (guest + owners), approved, rejected with reason, cancelled/expired with reason, payment proof uploaded (owners), reminder before the stay, test email
+- Listener on BookingStatusChanged plus new BookingCreated / PaymentProofUploaded events; runs only after commit (rolled-back actions email nobody)
+- Settings -> Notifications: one switch per email + "days before" for reminders, all respected in code; "Send test email" button; logo URL setting for email headers
+- Channel abstraction (NotificationChannelResolver + config) ready for SMS; how-to in docs/architecture.md
+- `bookings:send-reminders` daily 09:00 Asia/Manila, idempotent via `bookings.reminded_at`
+- Final send failures logged in the activity log (area "Email"); queue + Supervisor documented
+**Files created / modified:**
+- Notifications: app/Notifications/{BookingNotification,BookingReceived,BookingApproved,BookingRejected,BookingCancelled,PaymentProofReceived,BookingReminder,TestEmail}.php, app/Notifications/Channels/NotificationChannelResolver.php
+- Events/listener/services: app/Events/{BookingCreated,PaymentProofUploaded,BookingStatusChanged}.php, app/Listeners/SendBookingNotifications.php, app/Services/NotificationService.php, app/Services/SettingService.php, app/Services/Booking/{BookingService,PaymentProofService}.php
+- Command/schedule: app/Console/Commands/SendBookingReminders.php, routes/console.php
+- Settings/admin: app/Enums/{NotificationType,SettingGroup,ActivityAction}.php, app/Http/Controllers/Admin/TestEmailController.php, routes/web.php, resources/views/admin/settings/edit.blade.php, app/Providers/AppServiceProvider.php
+- Mail views/config: resources/views/mail/{html,text}/*, resources/views/mail/html/themes/wonderpool.css, resources/views/mail/bookings/*.blade.php, resources/views/mail/test.blade.php, config/mail.php, config/wonderpool.php
+- DB: database/migrations/2026_10_03_000100_add_reminded_at_to_bookings_table.php; app/Models/Booking.php
+- Tests: tests/Feature/Notifications/{BookingNotificationsTest,RemindersAndSettingsTest}.php
+- Docs: docs/{architecture,deployment,admin-guide}.md, .env.example, CHANGELOG.md, HISTORY.md, MILESTONES.md
+**DB changes:** bookings.reminded_at (nullable timestamp); migrate -> rollback -> migrate verified. New settings rows via SettingSeeder.
+**Routes:** admin.settings.test-email (POST /admin/settings/notifications/test-email).
+**How to verify:** `php artisan migrate && php artisan db:seed --class=SettingSeeder`; keep `MAIL_MAILER=log`, run `php artisan queue:work`; book as a guest with an email -> two emails in storage/logs/laravel.log (guest + owner); upload a proof -> owner email; approve/reject/cancel -> guest email with reason; Settings -> Notifications: untick "Booking approved", approve another -> no email; "Send test email"; `php artisan bookings:send-reminders` twice -> second run queues 0. Automated: `vendor/bin/pest` (540 tests; tests/Feature/Notifications/*), `vendor/bin/pint --test`, `vendor/bin/phpstan analyse` (no errors), `npm run build`.
+**Key decisions:** D-037 (notification pipeline, recipients, switches, no sensitive data), D-038 (reminder window + idempotency).
+**Edit entry points (where to change things later):**
+- **Email wording:** templates `resources/views/mail/bookings/*.blade.php` (one per email; shared facts table `_details.blade.php`), subject lines in each `app/Notifications/*.php` `toMail()`; header/footer `resources/views/mail/html/{header,footer}.blade.php` (+ `text/`), colors `resources/views/mail/html/themes/wonderpool.css`; switch labels `NotificationType::label()`.
+- **Add a channel (SMS):** follow docs/architecture.md "Adding a channel": channel class in `app/Notifications/Channels/`, `toSms()` on the notifications, route in `NotificationService::guest()` / `User`, `Notification::extend()` in AppServiceProvider, then `config/wonderpool.php` -> `notifications.channels`. Listeners and services stay unchanged.
+- **Reminder timing:** time of day = `REMINDER_TIME` in .env (`config/wonderpool.php` -> `notifications.reminder_time`, used in `routes/console.php`); days before = Settings -> Notifications (`notifications.reminder_days_before`); which bookings qualify = `NotificationService::sendReminders()`.
+- Who receives what: `NotificationService` (`bookingCreated()`, `statusChanged()`, `owners()`); new email type = case in `NotificationType` + notification class + call in NotificationService.
+**Known limitations / follow-ups:**
+- Emails verified by rendering in tests; no real SMTP send yet (configure MAIL_* and use "Send test email").
+- Admin alerts go to active owners only; no extra recipient address or staff option.
+- No SMS (PLAN section 14 Q8 open); no forgot-password email (D-015 still owner reset).
 
 ## M7 Reports & activity log (Done 2026-10-03, commit a53818f)
 **Goal:** The owner sees how the resort is doing (revenue, stays, occupancy), can export it, and can audit who did what.

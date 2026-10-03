@@ -42,6 +42,7 @@ use Illuminate\Support\Carbon;
  * @property string|null $admin_notes
  * @property int|null $approved_by
  * @property Carbon|null $approved_at
+ * @property Carbon|null $reminded_at Pre-stay reminder sent (M8)
  * @property BookingSource $source
  * @property int|null $created_by Admin who created a walk-in
  * @property int|null $original_total_cents Quoted total before an owner price override
@@ -108,6 +109,7 @@ class Booking extends Model
             'downpayment_required_cents' => 'integer',
             'status' => BookingStatus::class,
             'approved_at' => 'datetime',
+            'reminded_at' => 'datetime',
             'source' => BookingSource::class,
             'original_total_cents' => 'integer',
         ];

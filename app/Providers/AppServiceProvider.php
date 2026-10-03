@@ -56,5 +56,11 @@ class AppServiceProvider extends ServiceProvider
         View::composer(['layouts.public', 'partials.head', 'public.*'], function ($view): void {
             $view->with('site', $this->app->make(PublicContentService::class)->site());
         });
+
+        // Branded mail header/footer (M8): resort name, logo, contact details from settings.
+        View::composer(['mail::header', 'mail::footer'], function ($view): void {
+            $site = $this->app->make(PublicContentService::class)->site();
+            $view->with('brand', $site + ['logo_url' => $this->app->make(SettingService::class)->get('general.logo_url') ?: null]);
+        });
     }
 }
