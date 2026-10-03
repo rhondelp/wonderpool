@@ -15,6 +15,25 @@ ENTRY TEMPLATE
 
 ## Unreleased
 
+## [M8] Email notifications & reminders - 2026-10-03
+### Added
+- Queued notifications BookingReceived (guest + owners), BookingApproved, BookingRejected (reason), BookingCancelled (incl. expiry), PaymentProofReceived (owners), BookingReminder, TestEmail; base BookingNotification (afterCommit, 3 tries, failure -> activity log) (files: app/Notifications/*.php)
+- NotificationChannelResolver: channels per type from config, dropped when the recipient has no route (SMS-ready) (files: app/Notifications/Channels/NotificationChannelResolver.php, config/wonderpool.php)
+- NotificationService (recipients, switches, reminders, test email) and listener SendBookingNotifications (after commit) (files: app/Services/NotificationService.php, app/Listeners/SendBookingNotifications.php)
+- Events BookingCreated and PaymentProofUploaded (files: app/Events/{BookingCreated,PaymentProofUploaded}.php)
+- Command bookings:send-reminders (daily 09:00 Asia/Manila, idempotent via reminded_at) (files: app/Console/Commands/SendBookingReminders.php, routes/console.php)
+- Enum NotificationType; settings group Notifications (7 switches + reminder days) and general.logo_url; checkbox settings; SettingService::bool() (files: app/Enums/{NotificationType,SettingGroup}.php, app/Services/SettingService.php, resources/views/admin/settings/edit.blade.php)
+- "Send test email" button + route; ActivityAction mail.test_queued, mail.failed (files: app/Http/Controllers/Admin/TestEmailController.php, routes/web.php, app/Enums/ActivityAction.php)
+- Branded Markdown mail: components + wonderpool theme, booking templates, brand view composer (files: resources/views/mail/**, config/mail.php, app/Providers/AppServiceProvider.php)
+- Tests: every event + switch-off, rollback, queueing, content, failure log, reminder idempotency, schedule, settings, test email, resolver (files: tests/Feature/Notifications/*.php)
+### Changed
+- BookingService::create fires BookingCreated; reschedule clears reminded_at; PaymentProofService fires PaymentProofUploaded (files: app/Services/Booking/{BookingService,PaymentProofService}.php, app/Events/BookingStatusChanged.php)
+- Docs: notifications + adding a channel, queue worker/Supervisor, admin guide emails; .env.example mail notes + REMINDER_TIME (files: docs/{architecture,deployment,admin-guide}.md, .env.example)
+### DB: added 2026_10_03_000100_add_reminded_at_to_bookings_table (reversible)
+### Routes: added admin.settings.test-email (POST /admin/settings/notifications/test-email)
+### Breaking / Notes
+- Run `php artisan migrate` and `php artisan db:seed --class=SettingSeeder`. A queue worker must run (`php artisan queue:work`) or no email is sent.
+
 ## [M7] Reports & activity log - 2026-10-03
 ### Added
 - ReportService: summary (revenue received, booked value, stays, occupancy, status counts), gap-filled daily/monthly series, per-package breakdown, CSV booking rows, 30-day occupancy strip (files: app/Services/ReportService.php)
