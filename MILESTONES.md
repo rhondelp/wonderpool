@@ -10,7 +10,7 @@
 | M4 | 4 | Booking engine | Done | 2026-10-01 | a8ee111 |
 | M5 | 5 | Public site | Done | 2026-10-01 | d997511 |
 | M6 | 6 | Admin bookings | Done | 2026-10-01 | ff1085c |
-| M7 | 7 | Reports & logs | In review | 2026-10-03 | (pending) |
+| M7 | 7 | Reports & logs | In review | 2026-10-03 | a53818f |
 | M8 | 8 | Notifications | Not started | | |
 | M9 | 9 | Hardening | Not started | | |
 | M10 | 10 | Deploy & handover | Not started | | |
@@ -31,7 +31,7 @@ REPORT TEMPLATE (one per finished milestone, newest first below this comment)
 
 # Reports
 
-## M7 Reports & activity log (Done 2026-10-03, commit (pending))
+## M7 Reports & activity log (Done 2026-10-03, commit a53818f)
 **Goal:** The owner sees how the resort is doing (revenue, stays, occupancy), can export it, and can audit who did what.
 **Delivered:**
 - Dashboard: six-month "Revenue received" (owner only) and "Confirmed stays" bar charts, next-30-days occupancy strip (confirmed / pending / blocked / open)
