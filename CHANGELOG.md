@@ -15,6 +15,15 @@ ENTRY TEMPLATE
 
 ## Unreleased
 
+## [change/test-email-card-design] Settings test email card layout - 2026-10-05
+### Fixed
+- Settings -> Notifications: the "Test email" card fell into the narrow nav column on desktop (it relied on `lg:col-start-2`, missing from a stale asset build). Both cards now sit in one right-hand column wrapper; the card has an envelope icon, the recipient on its own line (wraps long addresses) and a full-width button on mobile (files: resources/views/admin/settings/edit.blade.php)
+- Flaky admin bookings search test: factory guest emails come from random PH names and could match the name search ("santos"); test bookings now use fixed emails (files: tests/Feature/Admin/Bookings/BookingIndexTest.php)
+### DB: none
+### Routes: none
+### Breaking / Notes
+- Run `npm run build` after pulling so new view classes are in the compiled CSS.
+
 ## [change/developer-credits] Developer credits - 2026-10-03
 ### Added
 - Developer credit (name + email, no phone: public repo) in the public footer and admin sidebar, from `config('wonderpool.developer')`; README "Developer" section; composer.json authors (files: config/wonderpool.php, resources/views/layouts/public.blade.php, resources/views/partials/admin-sidebar.blade.php, README.md, composer.json, tests/Feature/DeveloperCreditTest.php)

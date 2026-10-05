@@ -12,16 +12,17 @@ use App\Models\User;
 use Illuminate\Support\Carbon;
 
 beforeEach(function () {
+    // Fixed emails: the search also matches guest_email, and factory emails come from random PH names (e.g. "santos").
     $this->actingAs(User::factory()->create()); // staff may use bookings (D-029)
     $this->day = dayPackage();
     $this->night = nightPackage();
 
     $this->maria = Booking::factory()->for($this->day)->window(Carbon::parse('2027-02-01 07:00'), Carbon::parse('2027-02-01 17:00'))
-        ->create(['guest_name' => 'Maria Santos', 'guest_phone' => '+639171111111', 'reference_code' => 'WP-2702-AAAA', 'total_amount_cents' => 700_000, 'downpayment_required_cents' => 350_000]);
+        ->create(['guest_name' => 'Maria Santos', 'guest_email' => 'maria@example.com', 'guest_phone' => '+639171111111', 'reference_code' => 'WP-2702-AAAA', 'total_amount_cents' => 700_000, 'downpayment_required_cents' => 350_000]);
     $this->jose = Booking::factory()->for($this->night)->approved()->window(Carbon::parse('2027-03-05 19:00'), Carbon::parse('2027-03-06 05:00'))
-        ->create(['guest_name' => 'Jose Rizal', 'guest_phone' => '+639182222222', 'reference_code' => 'WP-2703-BBBB', 'total_amount_cents' => 900_000, 'downpayment_required_cents' => 450_000]);
+        ->create(['guest_name' => 'Jose Rizal', 'guest_email' => 'jose@example.com', 'guest_phone' => '+639182222222', 'reference_code' => 'WP-2703-BBBB', 'total_amount_cents' => 900_000, 'downpayment_required_cents' => 450_000]);
     $this->ana = Booking::factory()->for($this->day)->cancelled()->window(Carbon::parse('2027-04-10 07:00'), Carbon::parse('2027-04-10 17:00'))
-        ->create(['guest_name' => 'Ana Reyes', 'guest_phone' => '+639193333333', 'reference_code' => 'WP-2704-CCCC', 'total_amount_cents' => 700_000, 'downpayment_required_cents' => 350_000]);
+        ->create(['guest_name' => 'Ana Reyes', 'guest_email' => 'ana@example.com', 'guest_phone' => '+639193333333', 'reference_code' => 'WP-2704-CCCC', 'total_amount_cents' => 700_000, 'downpayment_required_cents' => 350_000]);
 });
 
 it('lists bookings with status tab counts', function () {
