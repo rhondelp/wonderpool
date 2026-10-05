@@ -58,6 +58,16 @@ class SettingService
     }
 
     /**
+     * Value of a checkbox setting ("1"/"0") as a bool; missing → the declared default.
+     *
+     * @param  string  $key  Dotted key
+     */
+    public function bool(string $key): bool
+    {
+        return in_array($this->get($key), ['1', 'true', 'on', 'yes'], true);
+    }
+
+    /**
      * Current values of every field in a group, in declaration order (defaults filled in).
      *
      * @return array<string, string|null>

@@ -32,6 +32,8 @@ enum ActivityAction: string
     case PaymentVerified = 'payment.verified';
     case PaymentRejected = 'payment.rejected';
     case ReportExported = 'report.exported';
+    case MailTestQueued = 'mail.test_queued';
+    case MailFailed = 'mail.failed';
 
     /**
      * Module prefixes (the part before the dot) with labels, for the activity log filter.
@@ -48,6 +50,7 @@ enum ActivityAction: string
             'booking' => 'Bookings',
             'payment' => 'Payments',
             'report' => 'Reports',
+            'mail' => 'Email',
         ];
     }
 
@@ -81,6 +84,8 @@ enum ActivityAction: string
             self::PaymentVerified => 'Verified payment',
             self::PaymentRejected => 'Rejected payment',
             self::ReportExported => 'Exported report',
+            self::MailTestQueued => 'Sent test email',
+            self::MailFailed => 'Email failed to send',
         };
     }
 }

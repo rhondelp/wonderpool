@@ -40,7 +40,9 @@
                         $inputId = str_replace('.', '-', $key);
                     @endphp
 
-                    @if ($field['type'] === 'textarea')
+                    @if ($field['type'] === 'checkbox')
+                        <x-ui.checkbox :name="$inputName" :id="$inputId" :label="$field['label']" :checked="$values[$key] === '1'" :hint="$field['hint'] ?? null" />
+                    @elseif ($field['type'] === 'textarea')
                         <x-ui.textarea :name="$inputName" :id="$inputId" :label="$field['label']" :value="$values[$key]" :hint="$field['hint'] ?? null" rows="4" />
                     @else
                         <x-ui.input :name="$inputName" :id="$inputId" :type="$field['type']" :label="$field['label']" :value="$values[$key]" :hint="$field['hint'] ?? null" />
@@ -52,5 +54,15 @@
                 </div>
             </form>
         </x-ui.card>
+
+        @if ($group === \App\Enums\SettingGroup::Notifications)
+            <x-ui.card title="Test email" class="lg:col-start-2">
+                <form method="POST" action="{{ route('admin.settings.test-email') }}" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    @csrf
+                    <p class="text-sm text-slate-600">Sends a sample email to <strong>{{ auth()->user()->email }}</strong> through the queue, to check the mail settings. Failures appear in the activity log.</p>
+                    <x-ui.button type="submit" variant="secondary" icon="paper-airplane" class="shrink-0">Send test email</x-ui.button>
+                </form>
+            </x-ui.card>
+        @endif
     </div>
 @endsection
