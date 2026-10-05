@@ -97,7 +97,7 @@
 | `app/Models/` | Eloquent models (see Models & Relationships) | M1 |
 | `app/Support/Money.php` | Centavo convert/format helpers (D-001); decimal() for CSV, compact() for chart axes (M7) | M1/M7 |
 | `config/app.php` | timezone = env APP_TIMEZONE (Asia/Manila) | M0 |
-| `config/wonderpool.php` | App config: `owner.*`, `turnstile.*` (M5), `notifications.channels`, `notifications.reminder_time` (M8) | M1/M5/M8 |
+| `config/wonderpool.php` | App config: `owner.*`, `turnstile.*` (M5), `notifications.channels`, `notifications.reminder_time` (M8), `developer.name/email` credit (footer, admin sidebar) | M1/M5/M8/change |
 | `config/mail.php` | + `markdown` theme `wonderpool`, paths `resources/views/mail` (M8) | M8 |
 | `resources/views/mail/` | `html/`, `text/` branded mail components + `html/themes/wonderpool.css`; `bookings/{_details,received-guest,received-owner,approved,rejected,cancelled,proof-received,reminder}`, `test` | M8 |
 | `database/migrations/2026_10_01_*` | M1 schema (users alter + 12 tables) | M1 |

@@ -11,6 +11,14 @@
 return [
 
     /*
+    | Developer credit shown in the public footer, the admin sidebar and README.md.
+    */
+    'developer' => [
+        'name' => 'Rhondel M. Pagobo',
+        'email' => 'rhondelpagobo19@gmail.com',
+    ],
+
+    /*
     | Initial owner account created by Database\Seeders\OwnerSeeder.
     | Never hard-code credentials: set these in .env. The seeder skips when email/password are empty.
     */

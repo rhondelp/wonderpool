@@ -15,6 +15,12 @@ ENTRY TEMPLATE
 
 ## Unreleased
 
+## [change/developer-credits] Developer credits - 2026-10-03
+### Added
+- Developer credit (name + email, no phone: public repo) in the public footer and admin sidebar, from `config('wonderpool.developer')`; README "Developer" section; composer.json authors (files: config/wonderpool.php, resources/views/layouts/public.blade.php, resources/views/partials/admin-sidebar.blade.php, README.md, composer.json, tests/Feature/DeveloperCreditTest.php)
+### DB: none
+### Routes: none
+
 ## [M8] Email notifications & reminders - 2026-10-03
 ### Added
 - Queued notifications BookingReceived (guest + owners), BookingApproved, BookingRejected (reason), BookingCancelled (incl. expiry), PaymentProofReceived (owners), BookingReminder, TestEmail; base BookingNotification (afterCommit, 3 tries, failure -> activity log) (files: app/Notifications/*.php)
