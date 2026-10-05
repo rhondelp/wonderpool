@@ -411,6 +411,7 @@ Layout: `<x-mail::message>` from resources/views/mail/html (header logo/name + f
 - PDF proofs are stored as uploaded (metadata not stripped). (M5)
 - Settings content/house rules/cancellation policy are placeholders until the owner provides them (§14). (M5)
 - No self-service "forgot password" email yet; owner resets passwords (D-015). Not added in M8 (spec did not include it). (M2/M8)
+- Compiled CSS only contains classes present at build time; re-run `npm run build` after switching branches or pulling view changes (a stale build broke the Settings test email card layout). (change)
 - Emails were rendered in tests only; send a real test email (Settings -> Notifications) once SMTP is configured. Only active owners receive admin alerts (no staff/extra address option). (M8)
 - SMS (PLAN section 14 Q8) not implemented; channel resolver is ready (docs/architecture.md). (M8)
 - Charts (dashboard, reports) were verified by markup/data tests only, not viewed in a real browser in M7. (M7)

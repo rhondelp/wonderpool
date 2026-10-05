@@ -27,42 +27,53 @@
             </ul>
         </nav>
 
-        <x-ui.card :title="$group->label()">
-            <form method="POST" action="{{ route('admin.settings.update', $group) }}" class="space-y-5">
-                @csrf
-                @method('PUT')
-
-                @foreach ($group->fields() as $key => $field)
-                    @php
-                        // Dotted key "booking.downpayment_percent" is submitted as booking[downpayment_percent].
-                        [$prefix, $name] = explode('.', $key, 2);
-                        $inputName = $prefix.'['.$name.']';
-                        $inputId = str_replace('.', '-', $key);
-                    @endphp
-
-                    @if ($field['type'] === 'checkbox')
-                        <x-ui.checkbox :name="$inputName" :id="$inputId" :label="$field['label']" :checked="$values[$key] === '1'" :hint="$field['hint'] ?? null" />
-                    @elseif ($field['type'] === 'textarea')
-                        <x-ui.textarea :name="$inputName" :id="$inputId" :label="$field['label']" :value="$values[$key]" :hint="$field['hint'] ?? null" rows="4" />
-                    @else
-                        <x-ui.input :name="$inputName" :id="$inputId" :type="$field['type']" :label="$field['label']" :value="$values[$key]" :hint="$field['hint'] ?? null" />
-                    @endif
-                @endforeach
-
-                <div class="flex justify-end">
-                    <x-ui.button type="submit" icon="check">Save {{ mb_strtolower($group->label()) }}</x-ui.button>
-                </div>
-            </form>
-        </x-ui.card>
-
-        @if ($group === \App\Enums\SettingGroup::Notifications)
-            <x-ui.card title="Test email" class="lg:col-start-2">
-                <form method="POST" action="{{ route('admin.settings.test-email') }}" class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div class="min-w-0 space-y-6">
+            <x-ui.card :title="$group->label()">
+                <form method="POST" action="{{ route('admin.settings.update', $group) }}" class="space-y-5">
                     @csrf
-                    <p class="text-sm text-slate-600">Sends a sample email to <strong>{{ auth()->user()->email }}</strong> through the queue, to check the mail settings. Failures appear in the activity log.</p>
-                    <x-ui.button type="submit" variant="secondary" icon="paper-airplane" class="shrink-0">Send test email</x-ui.button>
+                    @method('PUT')
+
+                    @foreach ($group->fields() as $key => $field)
+                        @php
+                            // Dotted key "booking.downpayment_percent" is submitted as booking[downpayment_percent].
+                            [$prefix, $name] = explode('.', $key, 2);
+                            $inputName = $prefix.'['.$name.']';
+                            $inputId = str_replace('.', '-', $key);
+                        @endphp
+
+                        @if ($field['type'] === 'checkbox')
+                            <x-ui.checkbox :name="$inputName" :id="$inputId" :label="$field['label']" :checked="$values[$key] === '1'" :hint="$field['hint'] ?? null" />
+                        @elseif ($field['type'] === 'textarea')
+                            <x-ui.textarea :name="$inputName" :id="$inputId" :label="$field['label']" :value="$values[$key]" :hint="$field['hint'] ?? null" rows="4" />
+                        @else
+                            <x-ui.input :name="$inputName" :id="$inputId" :type="$field['type']" :label="$field['label']" :value="$values[$key]" :hint="$field['hint'] ?? null" />
+                        @endif
+                    @endforeach
+
+                    <div class="flex justify-end">
+                        <x-ui.button type="submit" icon="check">Save {{ mb_strtolower($group->label()) }}</x-ui.button>
+                    </div>
                 </form>
             </x-ui.card>
-        @endif
+
+            @if ($group === \App\Enums\SettingGroup::Notifications)
+                <x-ui.card title="Test email">
+                    <form method="POST" action="{{ route('admin.settings.test-email') }}" class="flex flex-col gap-4 sm:flex-row sm:items-center">
+                        @csrf
+                        <div class="flex min-w-0 flex-1 items-start gap-3">
+                            <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-pool-50 text-pool-700" aria-hidden="true">
+                                <x-heroicon-o-envelope class="h-5 w-5" />
+                            </span>
+                            <div class="min-w-0 space-y-1 text-sm">
+                                <p class="text-slate-600">Sends a sample email through the queue to check the mail settings.</p>
+                                <p class="font-medium break-all text-slate-900">{{ auth()->user()->email }}</p>
+                                <p class="text-xs text-slate-500">Failures appear in the activity log.</p>
+                            </div>
+                        </div>
+                        <x-ui.button type="submit" variant="secondary" icon="paper-airplane" class="w-full shrink-0 sm:w-auto">Send test email</x-ui.button>
+                    </form>
+                </x-ui.card>
+            @endif
+        </div>
     </div>
 @endsection
