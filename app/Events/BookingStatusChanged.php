@@ -9,7 +9,9 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Fired by BookingService after a status change is committed. Notification listeners arrive in M8.
+ * Fired by BookingService after a status change is committed (may sit inside an outer transaction,
+ * e.g. walk-in + approval; listeners use ShouldHandleEventsAfterCommit). Handled by
+ * Listeners\SendBookingNotifications (M8).
  */
 class BookingStatusChanged
 {

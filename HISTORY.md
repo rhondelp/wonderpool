@@ -62,6 +62,8 @@
 | D-034 | 2026-10-03 | Report definitions: **revenue received** = verified payments dated by `verified_at` (same as the dashboard tile); **booked value / confirmed stays / occupancy** = approved + completed bookings dated by `starts_at`; occupancy = distinct stay-start days / days in range. Ranges are whole local days, `to` inclusive, max 731 days, default this month; charts per day up to 62 days, else per month. Package filter applies to payments through their booking (incl. soft-deleted). Charts are server-rendered SVG (`x-admin.bar-chart`, no JS lib) with a data table. | Cash view and occupancy view answer different owner questions; no chart dependency. | M7 |
 | D-035 | 2026-10-03 | Exports (owner only): bookings CSV streamed with UTF-8 BOM, pesos as plain decimals (`Money::decimal`), cells starting with = + - @ tab CR prefixed with `'` (so E.164 phones show as `'+639...`); summary PDF via DomPDF + `layouts/print` (tables only). Every export logs `report.exported` {format, from, to, package_id}. | Excel-friendly; CSV formula injection; guest data leaving the system is audited. | M7 |
 | D-036 | 2026-10-03 | Activity log screen is owner only (gate `view-activity-log` + role:owner), read-only, newest first, 50 per page. Filters: actor (`system` = null user), module prefix, action, dates; search = `properties::text ILIKE` or booking reference. No retention/pruning yet. | PLAN section 2.2 "who did what and when". | M7 |
+| D-037 | 2026-10-03 | Notifications: events (BookingCreated, BookingStatusChanged, PaymentProofUploaded) -> `SendBookingNotifications` (ShouldHandleEventsAfterCommit) -> `NotificationService` (recipient + switch) -> queued notifications (`ShouldQueue` + `afterCommit()`, 3 tries, backoff 60/300 s, `failed()` logs `mail.failed` with the address masked). Channels only via `NotificationChannelResolver` (config `wonderpool.notifications.channels`, default mail). Guests = on-demand mail route (no email, no message); owner alerts = active owners only; walk-ins get no "received" mail. Each type has a `notifications.*` switch (default on). Emails carry reference, package, schedule, guests and totals only: no proof links, phones or notes. | PLAN section 11; rollback-safe and SMS-ready. | M8 |
+| D-038 | 2026-10-03 | Reminders: `bookings:send-reminders` daily at `REMINDER_TIME` (09:00) Asia/Manila; approved bookings with an email, not yet reminded, starting after now and before the end of today + `notifications.reminder_days_before` (default 1) days. Each booking is claimed with `UPDATE ... WHERE reminded_at IS NULL` before queueing, so repeats/overlaps never send twice; switch off = nothing claimed. Reschedule clears `reminded_at`. | Idempotent; catches late approvals and missed runs. | M8 |
 | D-014 | 2026-10-01 | Database engine is PostgreSQL. Switched from MySQL on 2026-10-01 because MySQL does not run on the dev machine. JSON columns are jsonb (no key-order guarantee); emails stored lowercase via User/Booking mutators; booking creation to be serialized with `pg_advisory_xact_lock` (PLAN.md §5.2). | Local MariaDB unusable; PostgreSQL available locally and in CI. | M0.1 |
 
 ## Folder Map
@@ -73,9 +75,11 @@
 | `app/Enums/` | String-backed enums with label()/color() | M1 |
 | `app/Exceptions/ContentInUseException.php` | Delete refused (message shown to admins) | M3 |
 | `app/Exceptions/Booking/` | BookingException base + SlotUnavailable, GuestCountExceeded, InvalidAddOn, PackageUnavailable, InvalidStatusTransition, ReferenceCodeExhausted (M4); BookingWindow, PaymentProofNotAllowed, InvalidPaymentProof (M5) — messages safe to show | M4/M5 |
-| `app/Events/BookingStatusChanged.php` | Fired after each committed status change (listeners in M8) | M4 |
-| `app/Console/Commands/ExpireStaleBookings.php` | `bookings:expire-stale {--dry-run}` | M4 |
-| `app/Http/Controllers/Admin/` | Admin controllers; `Auth/` = Login, Password; content: Package, AddOn, Amenity, Gallery, Faq (M3); BlockedDate, PricingRule (M4); BookingController, BookingActionController, PaymentController (M6); ReportController, ActivityLogController (M7) | M2/M3/M4/M6/M7 |
+| `app/Events/` | BookingStatusChanged (M4), BookingCreated, PaymentProofUploaded (M8) | M4/M8 |
+| `app/Listeners/SendBookingNotifications.php` | Events -> NotificationService, after commit (auto-discovered) | M8 |
+| `app/Notifications/` | BookingNotification base + BookingReceived/Approved/Rejected/Cancelled/Reminder, PaymentProofReceived, TestEmail; `Channels/NotificationChannelResolver` | M8 |
+| `app/Console/Commands/` | ExpireStaleBookings `bookings:expire-stale` (M4), SendBookingReminders `bookings:send-reminders` (M8), both `{--dry-run}` | M4/M8 |
+| `app/Http/Controllers/Admin/` | Admin controllers; `Auth/` = Login, Password; content: Package, AddOn, Amenity, Gallery, Faq (M3); BlockedDate, PricingRule (M4); BookingController, BookingActionController, PaymentController (M6); ReportController, ActivityLogController (M7); TestEmailController (M8) | M2/M3/M4/M6/M7/M8 |
 | `app/Http/Controllers/Public/` | PageController (pages, sitemap, robots), BookingController (book, calendar, quote, store, payment, proof, done), TrackBookingController | M5 |
 | `app/Http/Requests/Public/` | QuoteRequest, StoreBookingRequest (extends Quote), UploadPaymentProofRequest, TrackBookingRequest | M5 |
 | `app/Rules/` | PhilippineMobile, Turnstile (implicit, off by default) | M5 |
@@ -93,7 +97,9 @@
 | `app/Models/` | Eloquent models (see Models & Relationships) | M1 |
 | `app/Support/Money.php` | Centavo convert/format helpers (D-001); decimal() for CSV, compact() for chart axes (M7) | M1/M7 |
 | `config/app.php` | timezone = env APP_TIMEZONE (Asia/Manila) | M0 |
-| `config/wonderpool.php` | App config: `owner.name/email/password` from env; `developer.name/email` credit (footer, admin sidebar) | M1/change |
+| `config/wonderpool.php` | App config: `owner.*`, `turnstile.*` (M5), `notifications.channels`, `notifications.reminder_time` (M8), `developer.name/email` credit (footer, admin sidebar) | M1/M5/M8/change |
+| `config/mail.php` | + `markdown` theme `wonderpool`, paths `resources/views/mail` (M8) | M8 |
+| `resources/views/mail/` | `html/`, `text/` branded mail components + `html/themes/wonderpool.css`; `bookings/{_details,received-guest,received-owner,approved,rejected,cancelled,proof-received,reminder}`, `test` | M8 |
 | `database/migrations/2026_10_01_*` | M1 schema (users alter + 12 tables) | M1 |
 | `database/factories/` | Factory per model; `Concerns/PhilippineData` (PH names, +639 mobiles) | M1 |
 | `database/seeders/` | DatabaseSeeder → Owner, Package, Amenity, Setting, Faq seeders | M1 |
@@ -114,7 +120,7 @@
 | `resources/views/components/admin/` | Admin-only components (x-admin.*) | M0 |
 | `resources/views/design-preview.blade.php` | Component gallery, local only (remove M9) | M0 |
 | `routes/web.php` | Web routes | M0 |
-| `routes/console.php` | Schedule: bookings:expire-stale every 15 min | M4 |
+| `routes/console.php` | Schedule: bookings:expire-stale every 15 min (M4), bookings:send-reminders daily 09:00 Manila (M8) | M4/M8 |
 | `tests/Feature/SmokeTest.php` | Boot/home/design-preview guard tests | M0 |
 | `tests/Feature/Models/` | FactoriesTest, BookingScopesTest (overlap edge cases), PostgresCompatibilityTest (lowercase emails, jsonb) | M1/M0.1 |
 | `tests/Feature/SeederTest.php` | Seed data, idempotency, owner env guard | M1 |
@@ -126,6 +132,7 @@
 | `tests/Feature/Admin/Bookings/` | BookingIndexTest, BookingActionsTest, PaymentsTest, WalkInAndReceiptTest | M6 |
 | `tests/Feature/Admin/Reports/` | ReportsTest (page, exports, access, dashboard charts), ActivityLogTest | M7 |
 | `tests/Feature/Services/ReportServiceTest.php` | Report figures, series, packages, occupancy strip | M7 |
+| `tests/Feature/Notifications/` | BookingNotificationsTest, RemindersAndSettingsTest | M8 |
 | `tests/Feature/Public/` | PagesTest, BookingFlowTest, QuoteEndpointTest, TrackBookingTest, AntiAbuseTest | M5 |
 | `tests/Unit/PhoneNumberTest.php` | Phone normalization | M5 |
 | `tests/Pest.php` | Helpers dayPackage(), nightPackage(), fullDayPackage(), bookingData() | M4 |
@@ -166,6 +173,7 @@
 | GET | `/admin/reports` (?from,to,package) | admin.reports.index | Admin\ReportController@index | + role:owner (view-financials) | M7 |
 | GET | `/admin/reports/export.csv`, `/admin/reports/export.pdf` (same query) | admin.reports.csv / .pdf | Admin\ReportController@csv/pdf (logged, D-035) | + role:owner | M7 |
 | GET | `/admin/activity-log` (?user,module,action,from,to,q) | admin.activity-log | Admin\ActivityLogController (invokable) | + role:owner (view-activity-log) | M7 |
+| POST | `/admin/settings/notifications/test-email` | admin.settings.test-email | Admin\TestEmailController (queues TestEmail to self) | + role:owner, throttle:5,1 | M8 |
 | GET | `/admin/settings` | admin.settings.index | redirect → /admin/settings/general | + role:owner | M2 |
 | GET/PUT | `/admin/settings/{group}` | admin.settings.edit / .update | Admin\SettingController@edit/update ({group} = SettingGroup) | + role:owner | M2 |
 | resource | `/admin/users` (except show, destroy) | admin.users.* | Admin\UserController | + role:owner | M2 |
@@ -188,7 +196,7 @@
 | packages | code UK, base_price_cents, start_time, end_time, crosses_midnight, max_pax, is_active, sort_order | → bookings (restrict), pricing_rules (cascade) | M1 |
 | add_ons | price_cents, is_active | → booking_add_ons (restrict) | M1 |
 | pricing_rules | package_id?, type, starts_on, ends_on, days_of_week json, adjustment_type, adjustment_value, priority | package (null = global) | M1 |
-| bookings | reference_code UK, package_id, starts_at, ends_at, total_amount_cents, downpayment_required_cents, status, approved_by, source (M6), created_by (M6), original_total_cents (M6), price_override_reason (M6), cancellation_reason (M6); soft deletes; IDX (starts_at,ends_at), status, guest_phone; EXCLUDE `bookings_no_overlap` (D-021, M4) | package, approver, creator (set null), booking_add_ons, payments | M1/M4/M6 |
+| bookings | reference_code UK, package_id, starts_at, ends_at, total_amount_cents, downpayment_required_cents, status, approved_by, source (M6), created_by (M6), original_total_cents (M6), price_override_reason (M6), cancellation_reason (M6), reminded_at (M8); soft deletes; IDX (starts_at,ends_at), status, guest_phone; EXCLUDE `bookings_no_overlap` (D-021, M4) | package, approver, creator (set null), booking_add_ons, payments | M1/M4/M6 |
 | booking_add_ons | booking_id, add_on_id (UK pair), quantity, unit_price_cents | booking (cascade), add_on (restrict) | M1 |
 | payments | booking_id, type, amount_cents, proof_path, status, reference_no, verified_by, notes (M6), recorded_by (M6), rejection_reason (M6) | booking (cascade), verifier (set null), recorder (set null) | M1/M6 |
 | blocked_dates | starts_at, ends_at, reason, created_by | creator (set null) | M1 |
@@ -227,17 +235,18 @@ Full dictionary + ERD: `docs/database.md`.
 | PricingRuleType | weekend, holiday, season; label() | M1 |
 | PricingAdjustmentType | percent (whole % points), fixed (signed centavos); label() | M1 |
 | GalleryCategory | pools, rooms, hall, events; label() | M1 |
-| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated, content.created/updated/deleted/reordered (M3), booking.created/status_changed/rescheduled/expired (M4), payment.proof_uploaded (M5), booking.price_overridden/notes_updated, payment.recorded/verified/rejected (M6), report.exported (M7); label(); static modules() = prefix => label (M7); add cases per module | M2/M3/M4/M5/M6/M7 |
+| ActivityAction | auth.login/logout/password_changed, user.created/updated/activated/deactivated/password_reset, settings.updated, content.created/updated/deleted/reordered (M3), booking.created/status_changed/rescheduled/expired (M4), payment.proof_uploaded (M5), booking.price_overridden/notes_updated, payment.recorded/verified/rejected (M6), report.exported (M7), mail.test_queued/failed (M8); label(); static modules() = prefix => label (M7); add cases per module | M2/M3/M4/M5/M6/M7 |
+| NotificationType | booking_received_guest, booking_received_owner, booking_approved, booking_rejected, booking_cancelled, payment_proof_received, booking_reminder; settingKey(), label() (D-037) | M8 |
 | ImageVariant | originals, large (1600), thumbs (480); maxEdge() (D-018) | M3 |
 | BookingSource | guest, admin; label() | M6 |
 | PaymentState | unpaid, proof_pending, partial, paid (derived, D-030); label(), color() | M6 |
-| SettingGroup | general, booking, payment, contact, social; label(), icon(), fields() = settings registry (D-017) | M2 |
+| SettingGroup | general, booking, payment, contact, social, content, seo (M5), notifications (M8); label(), icon(), fields() = settings registry (D-017) | M2 |
 
 ## Services Index
 | Class | Public methods (purpose) | Milestone |
 |---|---|---|
 | ActivityLogger | log(ActivityAction, ?Model subject, array properties, ?User actor) → ActivityLog | M2 |
-| SettingService | get(key, default), int(key, default), group(SettingGroup), update(SettingGroup, values) → changes (logged), all(), flush(), static declaredDefault(key) | M2 |
+| SettingService | get(key, default), int(key, default), bool(key) (M8), group(SettingGroup), update(SettingGroup, values) → changes (logged), all(), flush(), static declaredDefault(key) | M2 |
 | UserService | create, update, setActive, resetPassword (temp + force change), changeOwnPassword, recordLogin, recordLogout; all audited | M2 |
 | DashboardService | summary(?now) → pending/arrivals_today/upcoming_week/revenue_month_cents; upcoming(limit, ?now) | M2 |
 | Content\ContentService | create(class, data) (sortables appended), update(model, data), delete(model) (GuardsDeletion → ContentInUseException), reorder(class, ids) (D-020); all audited (D-019) | M3 |
@@ -257,6 +266,8 @@ Full dictionary + ERD: `docs/database.md`.
 | ReportService | summary(from, to, ?packageId): revenue_cents, payments, bookings, by_status, confirmed, booked_value_cents, average_cents, occupied_days, days, occupancy_percent; series(from, to, ?packageId, ?granularity day/month): list{key,label,revenue_cents,bookings}; byPackage(from, to): list{package, bookings, booked_value_cents, revenue_cents}; bookingRows(from, to, ?packageId): LazyCollection<Booking> (+verified_cents); occupancyStrip(days = 30, ?now): list{date, state confirmed/pending/closed/free}; granularity(), days(); static confirmedStatuses(); const MAX_RANGE_DAYS, DAILY_LIMIT_DAYS (D-034) | M7 |
 | ReportExportService | writeCsv(resource, from, to, ?packageId); csvRow(Booking); pdfData(from, to, ?packageId); filename(from, to, ext); logExport(User, format, from, to, ?packageId); static safeCell(string); const CSV_HEADERS (D-035) | M7 |
 | ActivityLogService | listing(filters, perPage = 50): LengthAwarePaginator; subjectLabel(log), subjectUrl(log), details(log): array<label, string>, actionLabel(string), actorOptions(); const SYSTEM_ACTOR (D-036) | M7 |
+| NotificationService | enabled(NotificationType); bookingCreated(Booking); statusChanged(Booking, BookingStatus $to, ?reason, bool $bySystem); proofUploaded(Booking); sendReminders(?now, dryRun): int (D-038); sendTest(User); owners(); guest(Booking): ?AnonymousNotifiable (D-037) | M8 |
+| Notifications\Channels\NotificationChannelResolver | channels(?NotificationType, notifiable): list<string> (config + route check) | M8 |
 | PublicContentService | site(): array{name, tagline, phone, email, address, map_embed_url, facebook_url, instagram_url, meta_description, og_image_url}; text(key): ?string; highlights(): list<string>; packages(); addOns(); amenities(?limit); gallery(?limit); faqs() — active/visible only (D-027) | M5 |
 
 ## Blade Components
@@ -317,16 +328,30 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 | content.cancellation_policy | content | "" | Policies page + booking step 3 (blank hides; §14 Q4) | M5 |
 | content.booking_success_note | content | (next steps text) | Success page "What happens next" | M5 |
 | seo.meta_description | seo | (default description) | `<meta name=description>` / og:description | M5 |
+| general.logo_url | general | "" | HTTPS logo shown in email headers (blank = name text) | M8 |
+| notifications.booking_received_guest / booking_received_owner / booking_approved / booking_rejected / booking_cancelled / payment_proof_received / booking_reminder | notifications | 1 | Checkbox switches ("1"/"0") per NotificationType (D-037) | M8 |
+| notifications.reminder_days_before | notifications | 1 | Reminder goes out this many days before the stay (1-7) | M8 |
 | seo.og_image_url | seo | "" | Share image; blank = first visible gallery photo | M5 |
 
 ## Scheduled Commands & Jobs
 | Command/Job | Schedule | Purpose | Milestone |
 |---|---|---|---|
 | `bookings:expire-stale {--dry-run}` | every 15 min, withoutOverlapping (routes/console.php) | Cancel unpaid pending bookings after `booking.pending_hold_hours` (D-024) | M4 |
+| `bookings:send-reminders {--dry-run}` | daily at `REMINDER_TIME` (09:00) Asia/Manila, withoutOverlapping | Queue BookingReminder once per approved booking (D-038) | M8 |
+| Queue worker `php artisan queue:work --tries=3` | always running (Supervisor in prod) | Sends every queued email (database driver) | M8 |
 
 ## Notifications & Mail Templates
 | Class | Channel(s) | Trigger | Template | Milestone |
 |---|---|---|---|---|
+| BookingReceived (guest) | mail (resolver) | BookingCreated, source guest; switch `notifications.booking_received_guest` | mail/bookings/received-guest | M8 |
+| BookingReceived (forOwner) | mail | same, to active owners; `notifications.booking_received_owner` | mail/bookings/received-owner | M8 |
+| BookingApproved | mail | BookingStatusChanged -> approved; `notifications.booking_approved` | mail/bookings/approved | M8 |
+| BookingRejected | mail | -> rejected (reason); `notifications.booking_rejected` | mail/bookings/rejected | M8 |
+| BookingCancelled | mail | -> cancelled, admin or expiry (reason, expired flag); `notifications.booking_cancelled` | mail/bookings/cancelled | M8 |
+| PaymentProofReceived | mail | PaymentProofUploaded, to active owners; `notifications.payment_proof_received` | mail/bookings/proof-received | M8 |
+| BookingReminder | mail | bookings:send-reminders; `notifications.booking_reminder` | mail/bookings/reminder | M8 |
+| TestEmail | mail | Settings -> Notifications -> Send test email | mail/test | M8 |
+Layout: `<x-mail::message>` from resources/views/mail/html (header logo/name + footer contact via `$brand` composer), theme `wonderpool.css`.
 
 ## Env Variables
 | Name | Purpose | Milestone |
@@ -338,7 +363,10 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 | APP_TIMEZONE | App timezone, read by config/app.php (Asia/Manila) | M0 |
 | DB_CONNECTION/HOST/PORT/DATABASE/USERNAME/PASSWORD | PostgreSQL connection: `pgsql`, 127.0.0.1:5432, db `wonderpool`, user `wonderpool_user` (tests: db `wonderpool_test`) | M0.1 |
 | SESSION_DRIVER, CACHE_STORE, QUEUE_CONNECTION | `database` (needs migrations) | M0 |
-| MAIL_* | Mailer; `log` in dev | M0 |
+| MAIL_MAILER / MAIL_SCHEME / MAIL_HOST / MAIL_PORT / MAIL_USERNAME / MAIL_PASSWORD | Mail transport: `log` in dev (emails in storage/logs/laravel.log), `smtp` + provider credentials in production (.env only) | M0/M8 |
+| MAIL_FROM_ADDRESS / MAIL_FROM_NAME | Sender of every email | M8 |
+| QUEUE_CONNECTION | `database`; a worker must run for emails to go out | M8 |
+| REMINDER_TIME | Daily reminder time, Asia/Manila (default 09:00) | M8 |
 | OWNER_NAME | Initial owner display name (OwnerSeeder) | M1 |
 | OWNER_EMAIL | Initial owner login email; seeder skips if empty | M1 |
 | OWNER_PASSWORD | Initial owner password (.env only, never committed); seeder skips if empty; must be changed on first login (D-015) | M1/M2 |
@@ -382,7 +410,9 @@ Defaults, labels and validation live in `SettingGroup::fields()` (D-017); this t
 - Booking page JS (calendar, quote, steps), gallery lightbox and copy button were not run in a real browser in M5 (Chrome extension unavailable); server endpoints/markup are tested. Manual check recommended. (M5)
 - PDF proofs are stored as uploaded (metadata not stripped). (M5)
 - Settings content/house rules/cancellation policy are placeholders until the owner provides them (§14). (M5)
-- No self-service "forgot password" email yet; owner resets passwords (D-015). Revisit in M8. (M2)
+- No self-service "forgot password" email yet; owner resets passwords (D-015). Not added in M8 (spec did not include it). (M2/M8)
+- Emails were rendered in tests only; send a real test email (Settings -> Notifications) once SMTP is configured. Only active owners receive admin alerts (no staff/extra address option). (M8)
+- SMS (PLAN section 14 Q8) not implemented; channel resolver is ready (docs/architecture.md). (M8)
 - Charts (dashboard, reports) were verified by markup/data tests only, not viewed in a real browser in M7. (M7)
 - Activity log has no retention/pruning; consider a cleanup command if it grows large. (M7)
 - Production needs the scheduler cron (`* * * * * php artisan schedule:run`) for booking expiry (D-024). (M4)

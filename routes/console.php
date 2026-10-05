@@ -12,3 +12,7 @@ Artisan::command('inspire', function () {
 | Scheduled tasks (production cron: * * * * * php artisan schedule:run).
 */
 Schedule::command('bookings:expire-stale')->everyFifteenMinutes()->withoutOverlapping();
+Schedule::command('bookings:send-reminders')
+    ->dailyAt((string) config('wonderpool.notifications.reminder_time', '09:00'))
+    ->timezone('Asia/Manila')
+    ->withoutOverlapping();

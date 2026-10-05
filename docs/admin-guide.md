@@ -46,5 +46,12 @@ Owner only. Every list has a search box (not case-sensitive) and an Active/Inact
 - Settings → **SEO**: the description Google shows and the image used when the site is shared on Facebook.
 - Settings → **Payment**: the GCash/bank instructions shown when guests book.
 
+## Email notifications
+- Settings → **Notifications** switches each email on or off: booking received (guest), new booking request (owners), approved, rejected (with your reason), cancelled or expired (guest), payment proof uploaded (owners) and the reminder before the stay. "Days before the stay" sets when the reminder goes out (once per booking, in the morning).
+- Owner emails go to every enabled owner account. Guests only receive emails if they gave an email address; walk-ins get an email once you approve them.
+- Emails never include payment proofs or phone numbers. The reasons you type when rejecting or cancelling are sent to the guest, so write them for the guest.
+- **Send test email** (same page) sends a sample to you. If it does not arrive within a few minutes, check Activity log → area "Email" and tell your developer (the queue worker may be stopped).
+- Settings → General → **Logo URL** puts your logo at the top of every email.
+
 ## Settings
 - Owner only. Tabs: General, Booking rules (downpayment %, pending hold, lead time, max advance days), Payment instructions, Contact, Social links. Every change is recorded in the activity log.

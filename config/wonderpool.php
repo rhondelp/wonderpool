@@ -38,4 +38,18 @@ return [
         'secret_key' => env('TURNSTILE_SECRET_KEY'),
     ],
 
+    /*
+    | Notifications (M8, D-037). Channels per NotificationType value; "default" applies to types
+    | not listed. Only "mail" exists today. To add SMS later: create the channel class and a
+    | toSms() method (docs/architecture.md), then list it here, e.g. 'booking_approved' => ['mail', 'sms'].
+    | Reminders: bookings:send-reminders runs daily at `reminder_time` (Asia/Manila); how many days
+    | before the stay is a setting (notifications.reminder_days_before).
+    */
+    'notifications' => [
+        'channels' => [
+            'default' => ['mail'],
+        ],
+        'reminder_time' => env('REMINDER_TIME', '09:00'),
+    ],
+
 ];
